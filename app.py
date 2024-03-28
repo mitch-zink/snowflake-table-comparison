@@ -3,11 +3,8 @@ import snowflake.connector
 import streamlit as st
 
 def compare_dataframes(df1, df2, key_column):
-    # Merging DataFrames on the key column
     merged_df = df1.merge(df2, on=key_column, how='outer', indicator=True, suffixes=('_original', '_modified'))
-    # Finding rows that are either different or missing in one of the DataFrames
     differences = merged_df[merged_df['_merge'] != 'both']
-    # Finding rows with matching keys but different values
     matched_but_different = merged_df[(merged_df['_merge'] == 'both') & 
                                       (merged_df.filter(like='_original').values != merged_df.filter(like='_modified').values).any(axis=1)]
     return differences, matched_but_different
@@ -18,7 +15,7 @@ def main():
     # User inputs for Snowflake connection and primary key column
     user = st.text_input("User")
     account = st.text_input("Account")
-    authenticator = 'externalbrowser'  # Assuming 'externalbrowser' for simplicity
+    authenticator = 'externalbrowser'
     warehouse = st.text_input("Warehouse")
     database = st.text_input("Database")
     schema = st.text_input("Schema")
@@ -35,27 +32,41 @@ def main():
     st.session_state['query_modified'] = st.text_area("Query for modified table", value=st.session_state['query_modified'], height=150)
 
     if st.button("Connect and Compare Tables"):
-        with st.spinner("Connecting to Snowflake..."):
-            try:
-                ctx = snowflake.connector.connect(
-                    user=user,
-                    account=account,
-                    authenticator=authenticator,
-                    warehouse=warehouse,
-                    database=database,
-                    schema=schema
-                )
-                st.success("Connected to Snowflake.")
+        if user and account and primary_key_column:
+            with st.spinner("Connecting to Snowflake..."):
+                try:
+                    ctx = snowflake.connector.connect(
+                        user=user,
+                        account=account,
+                        authenticator=authenticator,
+                        warehouse=warehouse,
+                        database=database,
+                        schema=schema
+                    )
+                    st.success("Connected to Snowflake.")
 
-                # Loading datasets
-                df_original = pd.read_sql(st.session_state['query_original'], ctx)
-                df_modified = pd.read_sql(st.session_state['query_modified'], ctx)
-
-                # Comparing DataFrames
-                if primary_key_column:  # Proceed if a primary key column has been specified
-                    differences, matched_but_different = compare_dataframes(df_original, df_modified, primary_key_column)
+                    progress_bar = st.progress(0)
                     
-                    # Displaying comparison results
+                    # Loading and displaying original dataset
+                    st.write("Loading original dataset...")
+                    df_original = pd.read_sql(st.session_state['query_original'], ctx)
+                    st.write("Original Dataset:")
+                    st.dataframe(df_original)
+                    progress_bar.progress(33)
+                    
+                    # Loading and displaying modified dataset
+                    st.write("Loading modified dataset...")
+                    df_modified = pd.read_sql(st.session_state['query_modified'], ctx)
+                    st.write("Modified Dataset:")
+                    st.dataframe(df_modified)
+                    progress_bar.progress(66)
+                    
+                    # Comparing DataFrames
+                    st.write("Comparing datasets...")
+                    differences, matched_but_different = compare_dataframes(df_original, df_modified, primary_key_column)
+                    progress_bar.progress(100)
+                    st.success("Comparison completed.")
+                    
                     if not differences.empty:
                         st.write("Rows with differences or missing in one of the tables:")
                         st.dataframe(differences)
@@ -67,12 +78,12 @@ def main():
                         st.dataframe(matched_but_different)
                     else:
                         st.success("No rows have the same ID but different values.")
-                else:
-                    st.error("Please specify a Primary Key Column for Comparison.")
 
-                ctx.close()
-            except Exception as e:
-                st.error(f"Failed to connect or compare: {e}")
+                    ctx.close()
+                except Exception as e:
+                    st.error(f"Failed to connect or compare: {e}")
+        else:
+            st.error("Please fill in all required fields.")
 
 if __name__ == "__main__":
     main()
