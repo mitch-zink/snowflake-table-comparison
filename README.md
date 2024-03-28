@@ -1,4 +1,4 @@
-# Snowflake Table Comparison Project
+# Snowflake Table Comparison
 
 This project contains a Streamlit app for comparing two tables in Snowflake to identify differences in rows and columns. It uses Snowflake's external browser-based authentication to securely access the data.
 
