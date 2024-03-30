@@ -54,8 +54,6 @@ def main():
     user = st.sidebar.text_input("User")
     account = st.sidebar.text_input("Account")
     warehouse = st.sidebar.text_input("Warehouse")
-    database = st.sidebar.text_input("Database")
-    schema = st.sidebar.text_input("Schema")
     primary_key_column = st.sidebar.text_input("Primary Key Column for Comparison")
     
     # Option to select authentication method
@@ -83,9 +81,7 @@ def main():
                         account=account,
                         password=password if not use_external_auth else None,
                         authenticator=authenticator,
-                        warehouse=warehouse,
-                        database=database,
-                        schema=schema
+                        warehouse=warehouse
                     )
                     st.success("Connected to Snowflake.")
 
