@@ -26,4 +26,4 @@ streamlit run app.py
 ### Row Level Analysis
 ![Row Level Analysis 1](row_level_analysis.png)
 ### Column and Aggregate Analysis
-![Column and Aggregate Analysis](column_and_aggregate_analysis.mp4)
+![Column and Aggregate Analysis](column_and_aggregate_analysis.gif)
