@@ -30,3 +30,4 @@ streamlit run app.py
 
 ## Roadmap
 - Better error handling and form validation for input values
+- Add filters to value level analysis
