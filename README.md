@@ -7,6 +7,11 @@
 
 This project contains a Streamlit app for comparing two tables in Snowflake to identify differences in rows and columns. It uses Snowflake's external browser-based authentication to securely access the data.
 
+## Roadmap
+- Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
+- Feature | Better error handling and form validation for input values
+- Feature | Add filters to value level analysis
+
 ## Setup Instructions
 
 ### Creating a Virtual Environment
@@ -27,7 +32,3 @@ streamlit run app.py
 ![Value Level Analysis 1](row_level_analysis.png)
 ### Column and Aggregate Analysis
 ![Column and Aggregate Analysis](column_and_aggregate_analysis.gif)
-
-## Roadmap
-- Better error handling and form validation for input values
-- Add filters to value level analysis

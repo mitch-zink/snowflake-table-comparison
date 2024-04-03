@@ -531,7 +531,7 @@ def main():
                 )
                 progress_bar.progress(40)
 
-                st.subheader("Schema Analysis 🔍")
+                st.header("Column Analysis 🔍")
                 st.dataframe(
                     schema_comparison_results[
                         [
