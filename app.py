@@ -414,12 +414,12 @@ def main():
 
     comparison_type = st.sidebar.radio(
         "Choose Comparison Type 🔄",
-        ["Row Level Analysis", "Column and Aggregate Analysis"],
+        ["Value Level Analysis", "Column and Aggregate Analysis"],
     )
 
-    # Row Level Analysis Inputs
-    if comparison_type == "Row Level Analysis":
-        st.sidebar.subheader("Row Level Analysis Inputs")
+    # Value Level Analysis Inputs
+    if comparison_type == "Value Level Analysis":
+        st.sidebar.subheader("Value Level Analysis Inputs")
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
             min_value=10,
@@ -469,8 +469,8 @@ def main():
             progress_bar.progress(20)
 
             # Run the selected comparison type
-            if comparison_type == "Row Level Analysis":
-                status_message.text("Fetching data for row level analysis...")
+            if comparison_type == "Value Level Analysis":
+                status_message.text("Fetching data for Value Level Analysis...")
                 query_top1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} ASC LIMIT {row_count}"
                 query_bottom1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} DESC LIMIT {row_count}"
                 query_top2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} ASC LIMIT {row_count}"
