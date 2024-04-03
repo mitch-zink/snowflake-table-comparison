@@ -437,7 +437,7 @@ def main():
 
     # Column and Aggregate Analysis Inputs
     elif comparison_type == "Column and Aggregate Analysis":
-        st.sidebar.subheader("Schema and Aggregate Analysis Inputs")
+        st.sidebar.subheader("Column and Aggregate Analysis Inputs")
         full_table_name1 = st.sidebar.text_input(
             "First Table 📝", "DATABASE.SCHEMA.TABLE"
         )
