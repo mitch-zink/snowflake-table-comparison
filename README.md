@@ -20,3 +20,10 @@ python3 -m venv venv && source venv/bin/activate && pip3 install --upgrade pip &
 ```bash
 streamlit run app.py
 ```
+
+## Examples (Snowflake Sample Data DB)
+
+### Row Level Analysis
+![Row Level Analysis 1](row_level_analysis.png)
+### Column and Aggregate Analysis
+![Column and Aggregate Analysis](column_and_aggregate_analysis.mp4)
