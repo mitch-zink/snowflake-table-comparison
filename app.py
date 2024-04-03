@@ -307,7 +307,7 @@ def execute_aggregate_query(
     query = f"""WITH table_agg AS (
                   SELECT COUNT(*) AS row_count, {aggregates_sql}
                   FROM "{catalog}"."{schema}"."{table}"
-                  {where_clause}  -- Incorporate the filter conditions
+                  {where_clause} 
                )
                SELECT * FROM table_agg;"""
     # Use sqlparse to format the query
