@@ -160,9 +160,9 @@ def fetch_schema(ctx, catalog, schema, table_name):
     generated_schema_queries.append(formatted_query)  # Store the schema fetch query
     return pd.read_sql(query, ctx)
 
-# Function to display generated schema fetch queries in a collapsible code block
+# Function to display generated queries in a collapsible code block
 def display_generated_schema_queries():
-    with st.expander("Schema Fetch Queries 👨‍💻"):
+    with st.expander("Column Queries 👨‍💻"):
         for query in generated_schema_queries:
             st.code(query, language="sql")
 
