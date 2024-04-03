@@ -3,3 +3,4 @@ pandas
 snowflake-connector-python
 streamlit
 plotly
+sqlparse

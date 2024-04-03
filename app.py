@@ -9,6 +9,10 @@ import snowflake.connector  # For connecting to Snowflake
 import streamlit as st  # UI
 import plotly.express as px  # For interactive visualizations
 import concurrent.futures  # For parallel execution of aggregate queries
+import sqlparse  # For formatting SQL queries
+
+# Global variable to store generated queries
+generated_queries = []
 
 
 # Function to query data from Snowflake
@@ -149,13 +153,15 @@ def fetch_schema(ctx, catalog, schema, table_name):
     query = f"""
     SELECT DISTINCT COLUMN_NAME, DATA_TYPE 
     FROM snowflake.account_usage.columns 
-    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}';
+    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL;
     """
     return pd.read_sql(query, ctx)
 
 
-# Perform aggregate analysis between two tables in Snowflake
-def perform_aggregate_analysis(ctx, full_table_name1, full_table_name2):
+# Function to perform aggregate analysis between two tables in Snowflake
+def perform_aggregate_analysis(
+    ctx, full_table_name1, full_table_name2, filter_conditions=""
+):
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
 
@@ -165,56 +171,84 @@ def perform_aggregate_analysis(ctx, full_table_name1, full_table_name2):
         df_schema1, df_schema2, on=["COLUMN_NAME", "DATA_TYPE"], how="inner"
     )
 
+    # If there are no matching columns, return a message indicating the same
+    if matching_columns.empty:
+        return pd.DataFrame(
+            {
+                "Column Name": ["No matching columns for aggregation"],
+                "Result": ["N/A"],
+                "Table 1 Value": ["N/A"],
+                "Table 2 Value": ["N/A"],
+                "Description": ["N/A"],
+            }
+        )
+
+    # Generate aggregate expressions for each column based on its data type
     aggregates = [
         aggregate_expression(row["COLUMN_NAME"], row["DATA_TYPE"])
         for _, row in matching_columns.iterrows()
         if aggregate_expression(row["COLUMN_NAME"], row["DATA_TYPE"])
     ]
-    if aggregates:
-        # Use ThreadPoolExecutor to run aggregate queries in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_to_table = {
-                executor.submit(
-                    execute_aggregate_query, ctx, catalog1, schema1, table1, aggregates
-                ): "first",
-                executor.submit(
-                    execute_aggregate_query, ctx, catalog2, schema2, table2, aggregates
-                ): "second",
-            }
-            for future in concurrent.futures.as_completed(future_to_table):
-                table_name = future_to_table[future]
-                try:
-                    results = future.result()  # Get the result of each future
-                    if table_name == "first":
-                        results1 = results
-                    else:
-                        results2 = results
-                except Exception as exc:
-                    print(f"{table_name} generated an exception: {exc}")
 
-        # Compare results and generate descriptions
-        checks = []
-        for column in results1.columns:
-            result = (
-                "Pass"
-                if results1[column].iloc[0] == results2[column].iloc[0]
-                else "Fail"
-            )
-            description = get_check_description(
-                column
-            )  # Get the description for each check
-            checks.append(
-                {"Check": column, "Result": result, "Description": description}
-            )
-        return pd.DataFrame(checks)
-    else:
-        return pd.DataFrame(
+    results1, results2 = None, None
+
+    # Execute aggregate queries in parallel using ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(
+                execute_aggregate_query,
+                ctx,
+                catalog1,
+                schema1,
+                table1,
+                aggregates,
+                filter_conditions,
+            ),
+            executor.submit(
+                execute_aggregate_query,
+                ctx,
+                catalog2,
+                schema2,
+                table2,
+                aggregates,
+                filter_conditions,
+            ),
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            if future.result() is not None:
+                if results1 is None:
+                    results1 = future.result()
+                else:
+                    results2 = future.result()
+
+    # If one or both tables failed to fetch results, return an error message
+    if results1 is None or results2 is None:
+        st.error("Failed to fetch results from one or both tables.")
+        return pd.DataFrame()
+
+    # Compare the results of aggregate analysis between both tables
+    comparison_results_list = []
+    for column in results1.columns:
+        val1, val2 = results1[column].iloc[0], results2[column].iloc[0]
+        str_val1, str_val2 = str(val1), str(val2)
+        result = "Pass" if str_val1 == str_val2 else "Fail"
+
+        # Append the comparison results to a list
+        comparison_results_list.append(
             {
-                "Check": ["No matching columns for aggregation"],
-                "Result": ["N/A"],
-                "Description": ["N/A"],
+                "Column Name": column,
+                "Result": result,
+                "Table 1 Value": str_val1,
+                "Table 2 Value": str_val2,
+                "Description": get_check_description(column),
             }
         )
+
+    # Convert the list of comparison results to a DataFrame
+    comparison_results = pd.DataFrame(comparison_results_list)
+    return comparison_results[
+        ["Column Name", "Result", "Table 1 Value", "Table 2 Value", "Description"]
+    ]
 
 
 # Function to generate descriptions based on aggregate column names (case-insensitive)
@@ -243,7 +277,6 @@ def get_check_description(column):
 
 
 # Function to define aggregate expressions based on the data type of a column.
-# This helps in creating SQL query parts for different types of aggregation analysis.
 def aggregate_expression(column_name, data_type):
     # Handling numeric types with SUM, COUNT, and APPROX_COUNT_DISTINCT
     if data_type.upper() in ["NUMBER", "FLOAT", "DECIMAL"]:
@@ -257,16 +290,32 @@ def aggregate_expression(column_name, data_type):
     return None
 
 
-# Function to execute an aggregate query in Snowflake and return the results as a DataFrame.
-# This function constructs and executes a SQL query with aggregated metrics.
-def execute_aggregate_query(ctx, catalog, schema, table, aggregates):
+# Function to execute an aggregate query on a table in Snowflake
+def execute_aggregate_query(
+    ctx, catalog, schema, table, aggregates, filter_conditions=""
+):
+    where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
     aggregates_sql = ", ".join(aggregates)
-    query = f'WITH table_agg AS (SELECT COUNT(*) AS row_count, {aggregates_sql} FROM "{catalog}"."{schema}"."{table}") SELECT * FROM table_agg;'
+    query = f"""WITH table_agg AS (
+                  SELECT COUNT(*) AS row_count, {aggregates_sql}
+                  FROM "{catalog}"."{schema}"."{table}"
+                  {where_clause}  -- Incorporate the filter conditions
+               )
+               SELECT * FROM table_agg;"""
+    # Use sqlparse to format the query
+    formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
+    generated_queries.append(formatted_query)  # Store the formatted query
     return pd.read_sql(query, ctx)
 
 
-# Function to plot schema comparison results using a bar chart.
-# This visualization helps in understanding the presence of columns in compared tables.
+# Function to display generated aggregate queries in a collapsible code block
+def display_generated_queries():
+    with st.expander("Aggregate Queries 👨‍💻"):
+        for query in generated_queries:
+            st.code(query, language="sql")
+
+
+# Function to plot schema comparison results using a bar chart
 def plot_schema_comparison_results(schema_comparison_results):
     counts = schema_comparison_results["Column Presence"].value_counts().reset_index()
     counts.columns = ["Category", "Count"]
@@ -288,7 +337,7 @@ def plot_schema_comparison_results(schema_comparison_results):
     st.plotly_chart(fig, use_container_width=True)
 
 
-# Function to plot a summary of the schema comparison focusing on data type matches/mismatches.
+# Function to plot a summary of the schema comparison focusing on data type matches/mismatches
 def plot_schema_comparison_summary(schema_comparison_results):
     data_type_counts = (
         schema_comparison_results["Data Type Match"]
@@ -315,7 +364,7 @@ def plot_schema_comparison_summary(schema_comparison_results):
     st.plotly_chart(fig_data_types, use_container_width=True)
 
 
-# Function to plot the results of aggregate analysis, indicating pass/fail status for each check.
+# Function to plot the results of aggregate analysis, indicating pass/fail status for each check
 def plot_aggregate_analysis_summary(aggregate_results):
     results_count = (
         aggregate_results["Result"]
@@ -334,6 +383,7 @@ def plot_aggregate_analysis_summary(aggregate_results):
     st.plotly_chart(fig, use_container_width=True)
 
 
+# Main function to run the Snowflake Table Comparison Tool
 def main():
     st.title("❄️ Snowflake Table Comparison Tool")
     status_message = st.empty()  # Centralized status message area for all updates
@@ -359,6 +409,8 @@ def main():
         "Choose Comparison Type 🔄",
         ["Row Level Analysis", "Column and Aggregate Analysis"],
     )
+
+    # Row Level Analysis Inputs
     if comparison_type == "Row Level Analysis":
         st.sidebar.subheader("Row Level Analysis Inputs")
         row_count = st.sidebar.slider(
@@ -375,6 +427,8 @@ def main():
         full_table_name2 = st.sidebar.text_input(
             "Second Table ✏️", "DATABASE.SCHEMA.TABLE"
         )
+
+    # Column and Aggregate Analysis Inputs
     elif comparison_type == "Column and Aggregate Analysis":
         st.sidebar.subheader("Schema and Aggregate Analysis Inputs")
         full_table_name1 = st.sidebar.text_input(
@@ -383,12 +437,18 @@ def main():
         full_table_name2 = st.sidebar.text_input(
             "Second Table ✏️", "DATABASE.SCHEMA.TABLE"
         )
+        filter_conditions = st.sidebar.text_area(
+            "Filter conditions (optional) ✨",
+            placeholder="email = 'mitch@example.com' AND date::date >= '2024-01-01'::date",
+        )
 
+    # Run Comparison Button
     if st.sidebar.button("Run Comparison 🚀"):
         st.snow()
         status_message.info("Preparing to connect to Snowflake...")
         progress_bar.progress(10)
 
+        # Connect to Snowflake and run the comparison
         try:
             status_message.text("Connecting to Snowflake...")
             ctx = snowflake.connector.connect(
@@ -401,6 +461,7 @@ def main():
             status_message.success("Connected to Snowflake ✅")
             progress_bar.progress(20)
 
+            # Run the selected comparison type
             if comparison_type == "Row Level Analysis":
                 status_message.text("Fetching data for row level analysis...")
                 query_top1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} ASC LIMIT {row_count}"
@@ -408,6 +469,7 @@ def main():
                 query_top2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} ASC LIMIT {row_count}"
                 query_bottom2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} DESC LIMIT {row_count}"
 
+                # Fetch data from both tables in parallel using ThreadPoolExecutor
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     future_to_df = {
                         executor.submit(fetch_data, ctx, query_top1): "top_first",
@@ -484,7 +546,7 @@ def main():
 
                 status_message.text("Performing aggregate analysis...")
                 aggregate_results = perform_aggregate_analysis(
-                    ctx, full_table_name1, full_table_name2
+                    ctx, full_table_name1, full_table_name2, filter_conditions
                 )
                 progress_bar.progress(60)
 
@@ -492,7 +554,7 @@ def main():
                 st.dataframe(aggregate_results)
                 plot_aggregate_analysis_summary(aggregate_results)
                 progress_bar.progress(80)
-
+                display_generated_queries()
             ctx.close()
             progress_bar.progress(100)
             status_message.text("Disconnected from Snowflake")
