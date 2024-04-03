@@ -11,9 +11,9 @@ import plotly.express as px  # For interactive visualizations
 import concurrent.futures  # For parallel execution of aggregate queries
 import sqlparse  # For formatting SQL queries
 
-# Global variable to store generated queries
+# Global variables to store generated queries
 generated_queries = []
-
+generated_schema_queries = []  # For storing schema fetch queries
 
 # Function to query data from Snowflake
 def fetch_data(ctx, query):
@@ -155,8 +155,16 @@ def fetch_schema(ctx, catalog, schema, table_name):
     FROM snowflake.account_usage.columns 
     WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL;
     """
+    # Store the formatted query for later display
+    formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
+    generated_schema_queries.append(formatted_query)  # Store the schema fetch query
     return pd.read_sql(query, ctx)
 
+# Function to display generated schema fetch queries in a collapsible code block
+def display_generated_schema_queries():
+    with st.expander("Schema Fetch Queries 👨‍💻"):
+        for query in generated_schema_queries:
+            st.code(query, language="sql")
 
 # Function to perform aggregate analysis between two tables in Snowflake
 def perform_aggregate_analysis(
@@ -191,7 +199,7 @@ def perform_aggregate_analysis(
     ]
 
     results1, results2 = None, None
-
+    
     # Execute aggregate queries in parallel using ThreadPoolExecutor
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
@@ -382,7 +390,6 @@ def plot_aggregate_analysis_summary(aggregate_results):
     )  # Lighter shade of blue
     st.plotly_chart(fig, use_container_width=True)
 
-
 # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.title("❄️ Snowflake Table Comparison Tool")
@@ -543,6 +550,7 @@ def main():
                 )
                 plot_schema_comparison_summary(schema_comparison_results)
                 plot_schema_comparison_results(schema_comparison_results)
+                display_generated_schema_queries()
 
                 status_message.text("Performing aggregate analysis...")
                 aggregate_results = perform_aggregate_analysis(
@@ -555,6 +563,7 @@ def main():
                 plot_aggregate_analysis_summary(aggregate_results)
                 progress_bar.progress(80)
                 display_generated_queries()
+
             ctx.close()
             progress_bar.progress(100)
             status_message.text("Disconnected from Snowflake")
