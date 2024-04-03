@@ -23,8 +23,8 @@ streamlit run app.py
 
 ## Examples (Snowflake Sample Data DB)
 
-### Row Level Analysis
-![Row Level Analysis 1](row_level_analysis.png)
+### Value Level Analysis
+![Value Level Analysis 1](row_level_analysis.png)
 ### Column and Aggregate Analysis
 ![Column and Aggregate Analysis](column_and_aggregate_analysis.gif)
 
