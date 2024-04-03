@@ -11,31 +11,6 @@ import plotly.express as px  # For interactive visualizations
 import concurrent.futures  # For parallel execution of aggregate queries
 import sqlparse  # For formatting SQL queries
 
-# Function to connect to Snowflake
-def snowflake_connect(user, account, password, authenticator, warehouse):
-    try:
-        ctx = snowflake.connector.connect(
-            user=user,
-            account=account,
-            password=password,
-            authenticator=authenticator,
-            warehouse=warehouse,
-        )
-        return ctx
-    except Exception as e:
-        # Specific catch for browser-based authentication failure
-        if "browser" in str(e).lower():
-            st.error(
-                """
-                Failed to automatically open a browser for authentication. 
-                Please manually open the authentication URL provided in the terminal or command prompt where you're running this Streamlit app.
-                After authentication, you might need to restart the app to proceed.
-                """
-            )
-        else:
-            st.error(f"Failed to connect to Snowflake: {e}")
-        return None
-
 # Global variables to store generated queries
 generated_queries = []
 generated_schema_queries = []  # For storing schema fetch queries
@@ -483,12 +458,14 @@ def main():
         # Connect to Snowflake and run the comparison
         try:
             status_message.text("Connecting to Snowflake...")
-            
-            # Connect to Snowflake
-            ctx = snowflake_connect(user, account, password, authenticator, warehouse)
-
-            if ctx:
-                status_message.success("Connected to Snowflake ✅")
+            ctx = snowflake.connector.connect(
+                user=user,
+                account=account,
+                password=password,
+                authenticator=authenticator,
+                warehouse=warehouse,
+            )
+            status_message.success("Connected to Snowflake ✅")
             progress_bar.progress(20)
 
             # Run the selected comparison type
