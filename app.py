@@ -416,19 +416,14 @@ def main():
 
     # Configuration sidebar setup
     st.sidebar.header("Configuration ⚙️")
-    user = st.sidebar.text_input("User 🧑‍💼")
-    account = st.sidebar.text_input("Account 🏦")
-    warehouse = st.sidebar.text_input("Warehouse 🏭")
-    authenticator = (
-        "externalbrowser"
-        if st.sidebar.checkbox("Use External Browser Authentication")
-        else "snowflake"
-    )
-    password = (
-        ""
-        if authenticator == "externalbrowser"
-        else st.sidebar.text_input("Password 🔒", type="password")
-    )
+    user = st.sidebar.text_input("User 🧑‍💼").upper()
+    account = st.sidebar.text_input("Account 🏦").upper()
+    warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
+    use_external_browser_auth = st.sidebar.checkbox("Use External Browser Authentication")
+    password = ""
+    authenticator = "externalbrowser" if use_external_browser_auth else "snowflake"
+    if not use_external_browser_auth:
+        password = st.sidebar.text_input("Password 🔒", type="password")
 
     comparison_type = st.sidebar.radio(
         "Choose Comparison Type 🔄",
@@ -445,34 +440,42 @@ def main():
             value=50,
             step=10,
         )
-        key_column = st.sidebar.text_input("Unique Key Column 🗝️")
+        key_column = st.sidebar.text_input("Unique Key Column 🗝️", placeholder="UNIQUE_KEY").upper()
         full_table_name1 = st.sidebar.text_input(
-            "First Table 📝", "DATABASE.SCHEMA.TABLE"
-        )
+            "First Table 📝", placeholder="DATABASE.SCHEMA.TABLE"
+        ).upper()
         full_table_name2 = st.sidebar.text_input(
-            "Second Table ✏️", "DATABASE.SCHEMA.TABLE"
-        )
+            "Second Table ✏️", placeholder="DATABASE.SCHEMA.TABLE"
+        ).upper()
 
     # Column and Aggregate Analysis Inputs
     elif comparison_type == "Column and Aggregate Analysis":
         st.sidebar.subheader("Column and Aggregate Analysis Inputs")
         full_table_name1 = st.sidebar.text_input(
-            "First Table 📝", "DATABASE.SCHEMA.TABLE"
-        )
+            "First Table 📝", placeholder="DATABASE.SCHEMA.TABLE"
+        ).upper()
         full_table_name2 = st.sidebar.text_input(
-            "Second Table ✏️", "DATABASE.SCHEMA.TABLE"
-        )
+            "Second Table ✏️", placeholder="DATABASE.SCHEMA.TABLE"
+        ).upper()
         filter_conditions = st.sidebar.text_area(
             "Filter conditions (optional) ✨",
-            placeholder="email = 'mitch@example.com' AND date::date >= '2024-01-01'::date",
+            placeholder="EMAIL = 'mitch@example.com' AND DATE::DATE >= '2024-01-01'::DATE",
         )
 
     # Run Comparison Button
     if st.sidebar.button("Run Comparison 🚀"):
-        st.snow()
-        status_message.info("Preparing to connect to Snowflake...")
-        progress_bar.progress(10)
-
+        # Form validation
+        if not user or not account or not warehouse:
+            st.error("Please fill in all required fields in the Configuration.")
+            return
+        if comparison_type == "Row and Value Level Analysis":
+            if not key_column or not full_table_name1 or not full_table_name2:
+                st.error("Please fill in all fields for Row and Value Level Analysis.")
+                return
+            if not full_table_name1.count('.') == 2 or not full_table_name2.count('.') == 2:
+                st.error("Please ensure both tables are in the format: DATABASE.SCHEMA.TABLE")
+                return
+            
         # Connect to Snowflake and run the comparison
         try:
             status_message.text("Connecting to Snowflake...")
