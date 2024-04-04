@@ -102,7 +102,7 @@ def compare_dataframes_by_key(df1, df2, key_column):
         on=key_column_lower,
         how="outer",
         indicator=True,
-        suffixes=("_original", "_modified"),
+        suffixes=("_table_1", "_table_2"),
     )
     differences = merged_df[merged_df["_merge"] != "both"]
 
@@ -112,14 +112,14 @@ def compare_dataframes_by_key(df1, df2, key_column):
     diff_data = {"key": [], "column": [], "Table 1": [], "Table 2": []}
     for _, row in merged_df.iterrows():
         for col in compare_cols:
-            original_val, modified_val = row[f"{col}_original"], row[f"{col}_modified"]
-            if pd.isna(original_val) and pd.isna(modified_val):
+            table_1_val, table_2_val = row[f"{col}_table_1"], row[f"{col}_table_2"]
+            if pd.isna(table_1_val) and pd.isna(table_2_val):
                 continue  # Skip comparison if both values are NaN
-            if original_val != modified_val:
+            if table_1_val != table_2_val:
                 diff_data["key"].append(row[key_column_lower])
                 diff_data["column"].append(col)
-                diff_data["Table 1"].append(original_val)
-                diff_data["Table 2"].append(modified_val)
+                diff_data["Table 1"].append(table_1_val)
+                diff_data["Table 2"].append(table_2_val)
 
     matched_but_different = pd.DataFrame(diff_data)
     return differences, matched_but_different
@@ -147,14 +147,26 @@ def compare_schemas(ctx, full_table_name1, full_table_name2):
             "both": "In Both Tables",
         }
     )
+
+    comparison_results = comparison_results.rename(
+        columns={
+            "DATA_TYPE_x": "Data Type Table 1",
+            "DATA_TYPE_y": "Data Type Table 2",
+        }
+    )
+
     comparison_results["Data Type Match"] = comparison_results.apply(
-        lambda row: "Match" if row["DATA_TYPE_x"] == row["DATA_TYPE_y"] else "Mismatch",
+        lambda row: "Match" if row["Data Type Table 1"] == row["Data Type Table 2"] else "Mismatch",
         axis=1,
     )
+
+    # Set "Data Type Match" to "N/A" for columns not present in both tables
     comparison_results.loc[
         comparison_results["Column Presence"] != "In Both Tables", "Data Type Match"
     ] = "N/A"
+    
     return comparison_results
+
 
 
 # Function to fetch schema details from Snowflake
