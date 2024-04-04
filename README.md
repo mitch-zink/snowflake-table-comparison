@@ -5,7 +5,18 @@
 [![Snowflake](https://img.shields.io/badge/-Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)](https://snowflake.com/)
 [![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 
-This project contains a Streamlit app for comparing two tables in Snowflake to identify differences in rows and columns. It uses Snowflake's external browser-based authentication to securely access the data.
+## Overview
+
+This tool analyzes differences between two Snowflake tables across three main sections:
+
+### 1. Column Analysis
+Compares data row-by-row to highlight discrepancies and matches between tables.
+
+### 2. Schema Analysis
+Examines table schemas to identify differences in column presence and data types.
+
+### 3. Aggregate Analysis
+Assesses aggregate data (like sums and counts) to check for data consistency at a higher level.
 
 ## Roadmap
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
