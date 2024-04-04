@@ -21,7 +21,6 @@ Assesses aggregate data (like sums and counts) to check for data consistency at 
 ## Roadmap
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
 - Documentation | Rename the app name that appears at the top of the page from app to Table Comparison - Snowflake
-- Documentation | Refresh the documentation and readme
 
 ## Setup Instructions
 
