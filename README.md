@@ -12,6 +12,7 @@ This project contains a Streamlit app for comparing two tables in Snowflake to i
 - Feature | Better error handling and form validation for input values
 - Feature | Add filters to value level analysis
 - Bug | Value Level Analysis - The chart counts the dummy rows
+- Documentation | Refresh the documentation and readme
 
 ## Setup Instructions
 
