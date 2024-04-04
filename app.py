@@ -3,22 +3,22 @@ Description: This application compares two tables in Snowflake
 Author: Mitch Zink
 Last Updated: 4/3/2024
 """
-
-import pandas as pd  # For data manipulation
-import snowflake.connector  # For connecting to Snowflake
+import pandas as pd  # Data manipulation
+import snowflake.connector  
 import streamlit as st  # UI
-import plotly.express as px  # For interactive visualizations
-import concurrent.futures  # For parallel execution of aggregate queries
-import sqlparse  # For formatting SQL queries
+import plotly.express as px  # Interactive visualizations
+import concurrent.futures  # Parallel execution of aggregate queries
+import sqlparse  # Formatting SQL queries
+import time
 
 # Global variables to store generated queries
-generated_queries = []
-generated_schema_queries = []  # For storing schema fetch queries
+generated_aggregate_queries = []
+generated_column_queries = []  # This will now store column-specific queries
+generated_schema_queries = []  # Adding a separate list for Generated Queries
 
 # Function to query data from Snowflake
 def fetch_data(ctx, query):
     return pd.read_sql(query, ctx)
-
 
 # Function to plot the comparison results using a bar chart
 def plot_comparison_results(
@@ -42,8 +42,8 @@ def plot_comparison_results(
     counts = {
         "Differences Between Tables": differences_count,
         "Detailed Differences for Matched Rows": matched_but_different_count,
-        "Rows Fetched from First Table": rows_fetched_from_first,
-        "Rows Fetched from Second Table": rows_fetched_from_second,
+        "Rows Fetched from Table 1": rows_fetched_from_first,
+        "Rows Fetched from Table 2": rows_fetched_from_second,
     }
     data = pd.DataFrame(list(counts.items()), columns=["Type", "Count"])
 
@@ -58,7 +58,6 @@ def plot_comparison_results(
     )
     fig.update_traces(texttemplate="%{text}", textposition="outside")
     fig.update_layout(
-        title_text="Comparison Results",
         xaxis_title="",
         yaxis_title="Count",
         margin=dict(t=60),
@@ -76,9 +75,9 @@ def compare_dataframes_by_key(df1, df2, key_column):
             [
                 {
                     key_column: "All rows match",
-                    "column": "N/A",
-                    "original_value": "N/A",
-                    "modified_value": "N/A",
+                    "Column": "N/A",
+                    "Table 1": "N/A",
+                    "Table 2": "N/A",
                 }
             ]
         )
@@ -110,7 +109,7 @@ def compare_dataframes_by_key(df1, df2, key_column):
     compare_cols = [
         col for col in df1.columns if col != key_column_lower and col in df2.columns
     ]
-    diff_data = {"key": [], "column": [], "original_value": [], "modified_value": []}
+    diff_data = {"key": [], "column": [], "Table 1": [], "Table 2": []}
     for _, row in merged_df.iterrows():
         for col in compare_cols:
             original_val, modified_val = row[f"{col}_original"], row[f"{col}_modified"]
@@ -119,14 +118,14 @@ def compare_dataframes_by_key(df1, df2, key_column):
             if original_val != modified_val:
                 diff_data["key"].append(row[key_column_lower])
                 diff_data["column"].append(col)
-                diff_data["original_value"].append(original_val)
-                diff_data["modified_value"].append(modified_val)
+                diff_data["Table 1"].append(original_val)
+                diff_data["Table 2"].append(modified_val)
 
     matched_but_different = pd.DataFrame(diff_data)
     return differences, matched_but_different
 
 
-# Compare schemas of two tables in Snowflake
+# Function to compare schemas of two tables in Snowflake and fetch schema details
 def compare_schemas(ctx, full_table_name1, full_table_name2):
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
@@ -143,8 +142,8 @@ def compare_schemas(ctx, full_table_name1, full_table_name2):
     )
     comparison_results["Column Presence"] = comparison_results["Column Presence"].map(
         {
-            "left_only": "Only in First Table",
-            "right_only": "Only in Second Table",
+            "left_only": "Only in Table 1",
+            "right_only": "Only in Table 2",
             "both": "In Both Tables",
         }
     )
@@ -159,22 +158,22 @@ def compare_schemas(ctx, full_table_name1, full_table_name2):
 
 
 # Function to fetch schema details from Snowflake
-def fetch_schema(ctx, catalog, schema, table_name):
-    query = f"""
-    SELECT DISTINCT COLUMN_NAME, DATA_TYPE 
+def fetch_schema(ctx, catalog, schema, table_name, filter_conditions=""):
+    where_clause = f" AND {filter_conditions}" if filter_conditions else ""
+    schema_query = f"""
+    SELECT COLUMN_NAME, DATA_TYPE 
     FROM snowflake.account_usage.columns 
-    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL;
+    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL{where_clause};
     """
-    # Store the formatted query for later display
-    formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
-    generated_schema_queries.append(formatted_query)  # Store the schema fetch query
-    return pd.read_sql(query, ctx)
+    # Formatting schema fetch query for readability
+    formatted_schema_query = sqlparse.format(schema_query, reindent=True, keyword_case="lower")
 
-# Function to display generated queries in a collapsible code block
-def display_generated_schema_queries():
-    with st.expander("Column Queries 👨‍💻"):
-        for query in generated_schema_queries:
-            st.code(query, language="sql")
+    # Check if the formatted schema query already exists in generated_schema_queries to avoid duplicates
+    if formatted_schema_query not in generated_schema_queries:
+        generated_schema_queries.append(formatted_schema_query)  # Add the formatted schema query if it's unique
+
+    # Returning the dataframe result of the schema query
+    return pd.read_sql(schema_query, ctx)
 
 # Function to perform aggregate analysis between two tables in Snowflake
 def perform_aggregate_analysis(
@@ -317,9 +316,7 @@ def aggregate_expression(column_name, data_type):
 
 
 # Function to execute an aggregate query on a table in Snowflake
-def execute_aggregate_query(
-    ctx, catalog, schema, table, aggregates, filter_conditions=""
-):
+def execute_aggregate_query(ctx, catalog, schema, table, aggregates, filter_conditions=""):
     where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
     aggregates_sql = ", ".join(aggregates)
     query = f"""WITH table_agg AS (
@@ -329,16 +326,28 @@ def execute_aggregate_query(
                )
                SELECT * FROM table_agg;"""
     # Use sqlparse to format the query
-    formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
-    generated_queries.append(formatted_query)  # Store the formatted query
+    formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
+    generated_aggregate_queries.append(formatted_query)  # Store the formatted query
     return pd.read_sql(query, ctx)
 
-
 # Function to display generated aggregate queries in a collapsible code block
-def display_generated_queries():
-    with st.expander("Aggregate Queries 👨‍💻"):
-        for query in generated_queries:
-            st.code(query, language="sql")
+def display_all_generated_queries():
+    with st.expander("Generated Queries 👨‍💻"):
+        # Schema Queries Section
+        if generated_schema_queries:
+            st.markdown("### Schema Queries")
+            for query in generated_schema_queries:
+                st.code(query, language="sql")
+        # Column Queries Section
+        if generated_column_queries:
+            st.markdown("### Column Queries")
+            for query in generated_column_queries:
+                st.code(query, language="sql")  
+        # Aggregate Queries Section
+        if generated_aggregate_queries:
+            st.markdown("### Aggregate Queries")
+            for query in generated_aggregate_queries:
+                st.code(query, language="sql")
 
 
 # Function to plot schema comparison results using a bar chart
@@ -351,7 +360,7 @@ def plot_schema_comparison_results(schema_comparison_results):
         y="Count",
         text="Count",
         color_discrete_sequence=["#2980b9"],
-    )  # A shade of blue
+    )  
     fig.update_traces(texttemplate="%{text}", textposition="outside")
     fig.update_layout(
         xaxis_title="Column Presence",
@@ -377,8 +386,8 @@ def plot_schema_comparison_summary(schema_comparison_results):
         x="Match Status",
         y="Count",
         text="Count",
-        color_discrete_sequence=["#3498db"],
-    )  # Another shade of blue
+        color_discrete_sequence=["#2980b9"],
+    )  
     fig_data_types.update_traces(texttemplate="%{text}", textposition="outside")
     fig_data_types.update_layout(
         xaxis_title="Data Type Match",
@@ -404,15 +413,13 @@ def plot_aggregate_analysis_summary(aggregate_results):
         x="Result",
         y="Count",
         labels={"Result": "Test Result"},
-        color_discrete_sequence=["#5DADE2"],
-    )  # Lighter shade of blue
+        color_discrete_sequence=["#2980b9"],
+    )  
     st.plotly_chart(fig, use_container_width=True)
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.title("❄️ Snowflake Table Comparison Tool")
-    status_message = st.empty()  # Centralized status message area for all updates
-    progress_bar = st.progress(0)
 
     # Configuration sidebar setup
     st.sidebar.header("Configuration ⚙️")
@@ -424,61 +431,57 @@ def main():
     authenticator = "externalbrowser" if use_external_browser_auth else "snowflake"
     if not use_external_browser_auth:
         password = st.sidebar.text_input("Password 🔒", type="password")
-
-    comparison_type = st.sidebar.radio(
-        "Choose Comparison Type 🔄",
-        ["Row and Value Level Analysis", "Column and Aggregate Analysis"],
+    row_count = st.sidebar.slider(
+        "Number of Rows from Top/Bottom",
+        min_value=10,
+        max_value=1000,
+        value=50,
+        step=10,
+    )
+    key_column = st.sidebar.text_input("Unique Key Column 🗝️", placeholder="UNIQUE_KEY").upper()
+    full_table_name1 = st.sidebar.text_input(
+        "Table 1 📝", placeholder="DATABASE.SCHEMA.TABLE"
+    ).upper()
+    full_table_name2 = st.sidebar.text_input(
+        "Table 2 ✏️", placeholder="DATABASE.SCHEMA.TABLE"
+    ).upper()
+    filter_conditions = st.sidebar.text_area(
+        "Filter conditions (optional) ✨",
+        placeholder="EMAIL = 'mitch@example.com' AND DATE::DATE >= '2024-01-01'::DATE",
     )
 
-    # Row and Value Level Analysis Inputs
-    if comparison_type == "Row and Value Level Analysis":
-        st.sidebar.subheader("Row and Value Level Analysis Inputs")
-        row_count = st.sidebar.slider(
-            "Number of Rows from Top/Bottom",
-            min_value=10,
-            max_value=1000,
-            value=50,
-            step=10,
-        )
-        key_column = st.sidebar.text_input("Unique Key Column 🗝️", placeholder="UNIQUE_KEY").upper()
-        full_table_name1 = st.sidebar.text_input(
-            "First Table 📝", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
-        full_table_name2 = st.sidebar.text_input(
-            "Second Table ✏️", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
+    # Initialize session state for progress and status updates
+    if 'progress' not in st.session_state:
+        st.session_state.progress = 0
+    if 'status_message' not in st.session_state:
+        st.session_state.status_message = "Ready"
 
-    # Column and Aggregate Analysis Inputs
-    elif comparison_type == "Column and Aggregate Analysis":
-        st.sidebar.subheader("Column and Aggregate Analysis Inputs")
-        full_table_name1 = st.sidebar.text_input(
-            "First Table 📝", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
-        full_table_name2 = st.sidebar.text_input(
-            "Second Table ✏️", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
-        filter_conditions = st.sidebar.text_area(
-            "Filter conditions (optional) ✨",
-            placeholder="EMAIL = 'mitch@example.com' AND DATE::DATE >= '2024-01-01'::DATE",
-        )
+    # Helper function to update progress and status message
+    def update_progress(new_progress, new_message):
+        if new_progress is not None:
+            st.session_state.progress = new_progress
+            progress_bar.progress(st.session_state.progress)
+        if new_message:
+            st.session_state.status_message = new_message
+            status_message.text(st.session_state.status_message)
 
-    # Run Comparison Button
+    # Placeholders for progress bar and status message
+    progress_bar = st.progress(st.session_state.progress)
+    status_message = st.empty()
+    status_message.text(st.session_state.status_message)
+
     if st.sidebar.button("Run Comparison 🚀"):
-        # Form validation
-        if not user or not account or not warehouse:
-            st.error("Please fill in all required fields in the Configuration.")
+        if not user or not account or not warehouse or not full_table_name1 or not full_table_name2:
+            st.error("Please fill in all required fields.")
             return
-        if comparison_type == "Row and Value Level Analysis":
-            if not key_column or not full_table_name1 or not full_table_name2:
-                st.error("Please fill in all fields for Row and Value Level Analysis.")
-                return
-            if not full_table_name1.count('.') == 2 or not full_table_name2.count('.') == 2:
-                st.error("Please ensure both tables are in the format: DATABASE.SCHEMA.TABLE")
-                return
-            
-        # Connect to Snowflake and run the comparison
+
+        if not full_table_name1.count('.') == 2 or not full_table_name2.count('.') == 2:
+            st.error("Please ensure both tables are in the format: DATABASE.SCHEMA.TABLE")
+            return
+
         try:
-            status_message.text("Connecting to Snowflake...")
+            st.snow()
+            update_progress(10, "Connecting to Snowflake...")
             ctx = snowflake.connector.connect(
                 user=user,
                 account=account,
@@ -486,113 +489,89 @@ def main():
                 authenticator=authenticator,
                 warehouse=warehouse,
             )
-            status_message.success("Connected to Snowflake ✅")
-            progress_bar.progress(20)
+            update_progress(20, "Connected to Snowflake ✅")
+            time.sleep(3)
 
-            # Run the selected comparison type
-            if comparison_type == "Row and Value Level Analysis":
-                status_message.text("Fetching data for Row and Value Level Analysis...")
-                query_top1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} ASC LIMIT {row_count}"
-                query_bottom1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} DESC LIMIT {row_count}"
-                query_top2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} ASC LIMIT {row_count}"
-                query_bottom2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} DESC LIMIT {row_count}"
+            base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
+            queries = [
+                f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
+                f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}",
+                f"SELECT * FROM {full_table_name2} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
+                f"SELECT * FROM {full_table_name2} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}"
+            ]
 
-                # Fetch data from both tables in parallel using ThreadPoolExecutor
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    future_to_df = {
-                        executor.submit(fetch_data, ctx, query_top1): "top_first",
-                        executor.submit(fetch_data, ctx, query_bottom1): "bottom_first",
-                        executor.submit(fetch_data, ctx, query_top2): "top_second",
-                        executor.submit(
-                            fetch_data, ctx, query_bottom2
-                        ): "bottom_second",
-                    }
-                    dfs = {}
-                    for future in concurrent.futures.as_completed(future_to_df):
-                        part_name = future_to_df[future]
-                        try:
-                            dfs[part_name] = future.result()
-                        except Exception as exc:
-                            status_message.error(
-                                f"{part_name} table fetch generated an exception: {exc}"
-                            )
+            # Format each query using sqlparse and add to the generated_column_queries list
+            for query in queries:
+                formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
+                generated_column_queries.append(formatted_query)
+            
+            # Fetch data from both tables
+            update_progress(30, "Running Snowflake Queries 🏃‍♂️💨")
+            dfs = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                future_to_query = {executor.submit(fetch_data, ctx, query): query for query in queries}
+                for future in concurrent.futures.as_completed(future_to_query):
+                    query = future_to_query[future]
+                    try:
+                        dfs[query] = future.result()
+                    except Exception as exc:
+                        st.error(f"Query {query} generated an exception: {exc}")
+                        return
 
-                df1 = pd.concat([dfs["top_first"], dfs["bottom_first"]])
-                df2 = pd.concat([dfs["top_second"], dfs["bottom_second"]])
-                progress_bar.progress(40)
+            df1 = pd.concat([dfs[queries[0]], dfs[queries[1]]])
+            df2 = pd.concat([dfs[queries[2]], dfs[queries[3]]])
 
-                differences, matched_but_different = compare_dataframes_by_key(
-                    df1, df2, key_column
-                )
-
-                total_rows_fetched_first = len(dfs["top_first"]) + len(
-                    dfs["bottom_first"]
-                )
-                total_rows_fetched_second = len(dfs["top_second"]) + len(
-                    dfs["bottom_second"]
-                )
-
-                plot_comparison_results(
-                    differences,
-                    matched_but_different,
-                    total_rows_fetched_first,
-                    total_rows_fetched_second,
-                )
-
-                st.subheader("Differences between Tables 📊")
+            update_progress(40, "Working on column analysis...")
+            differences, matched_but_different = compare_dataframes_by_key(df1, df2, key_column)
+            st.header("Column Analysis 🔎")
+            plot_comparison_results(differences, matched_but_different, len(df1), len(df2))
+            if not differences.empty:
                 st.dataframe(differences)
-                st.subheader("Detailed Differences for Matched Rows 📑")
+            if not matched_but_different.empty:
                 st.dataframe(matched_but_different)
-                progress_bar.progress(80)
+                
 
-            elif comparison_type == "Column and Aggregate Analysis":
-                status_message.text("Fetching schema comparison data...")
-                schema_comparison_results = compare_schemas(
-                    ctx, full_table_name1, full_table_name2
-                )
-                progress_bar.progress(40)
+            with st.expander("Column Queries 🐸"):
+                for query in generated_column_queries:
+                    st.code(query, language="sql")
 
-                st.header("Column Analysis 🔍")
-                st.dataframe(
-                    schema_comparison_results[
-                        [
-                            "COLUMN_NAME",
-                            "DATA_TYPE_x",
-                            "DATA_TYPE_y",
-                            "Column Presence",
-                            "Data Type Match",
-                        ]
-                    ].rename(
-                        columns={
-                            "DATA_TYPE_x": "Data Type (First Table)",
-                            "DATA_TYPE_y": "Data Type (Second Table)",
-                        }
-                    )
-                )
-                plot_schema_comparison_summary(schema_comparison_results)
-                plot_schema_comparison_results(schema_comparison_results)
-                display_generated_schema_queries()
 
-                status_message.text("Performing aggregate analysis...")
-                aggregate_results = perform_aggregate_analysis(
-                    ctx, full_table_name1, full_table_name2, filter_conditions
-                )
-                progress_bar.progress(60)
+            update_progress(50, "Column analysis completed ✅")
+            time.sleep(1)
+            
+            update_progress(60, "Working on schema analysis...")
+            schema_comparison_results = compare_schemas(ctx, full_table_name1, full_table_name2)
+            st.header("Schema Analysis 🔎")
+            st.dataframe(schema_comparison_results)
+            plot_schema_comparison_results(schema_comparison_results)
+            plot_schema_comparison_summary(schema_comparison_results)
+            # Right after plotting schema comparison results:
+            if generated_schema_queries:
+                with st.expander("Schema Queries 🤖"):
+                    for query in generated_schema_queries:
+                        st.code(query, language="sql")
+            update_progress(70, "Schema analysis completed ✅")
+            time.sleep(1)
 
-                st.header("Aggregate Analysis 🔍")
-                st.dataframe(aggregate_results)
-                plot_aggregate_analysis_summary(aggregate_results)
-                progress_bar.progress(80)
-                display_generated_queries()
+            update_progress(80, "Working on aggregate analysis...")
+            aggregate_results = perform_aggregate_analysis(ctx, full_table_name1, full_table_name2, filter_conditions)
+            st.header("Aggregate Analysis 🔎")
+            st.dataframe(aggregate_results)
+            plot_aggregate_analysis_summary(aggregate_results)
+            
+            # After plotting the aggregate analysis summary:
+            if generated_aggregate_queries:
+                with st.expander("Aggregate Queries 🥷"):
+                    for query in generated_aggregate_queries:
+                        st.code(query, language="sql")
 
-            ctx.close()
-            progress_bar.progress(100)
-            status_message.text("Disconnected from Snowflake")
+            update_progress(99, "Aggregate analysis completed ✅")
+            time.sleep(1)
+
+            update_progress(100, "Analysis completed ✅")
 
         except Exception as e:
-            progress_bar.progress(0)
-            status_message.error(f"Failed to run comparison: {e}")
-
+            update_progress(0, f"Failed to run analysis: {e}")
 
 if __name__ == "__main__":
     main()
