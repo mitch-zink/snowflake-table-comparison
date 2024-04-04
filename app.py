@@ -13,8 +13,8 @@ import time
 
 # Global variables to store generated queries
 generated_aggregate_queries = []
-generated_column_queries = []  # This will now store column-specific queries
-generated_schema_queries = []  # Adding a separate list for Generated Queries
+generated_column_queries = []  
+generated_schema_queries = []  
 
 # Function to query data from Snowflake
 def fetch_data(ctx, query):
