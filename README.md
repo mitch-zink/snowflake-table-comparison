@@ -9,11 +9,11 @@
 
 This tool analyzes differences between two Snowflake tables across three main sections:
 
-### 1. Column Analysis
+### 1. Row Level Analysis
 Compares data row-by-row to highlight discrepancies and matches between tables.
 
-### 2. Schema Analysis
-Examines table schemas to identify differences in column presence and data types.
+### 2. Column Analysis
+Examines columns to identify differences in column presence and data types.
 
 ### 3. Aggregate Analysis
 Assesses aggregate data (like sums and counts) to check for data consistency at a higher level.

@@ -514,11 +514,12 @@ def main():
 
             # Format each query using sqlparse and add to the generated_column_queries list
             for query in queries:
-                formatted_query = sqlparse.format(query, reindent=True, keyword_case="upper")
+                formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
                 generated_column_queries.append(formatted_query)
             
             # Fetch data from both tables
             update_progress(30, "Running Snowflake Queries 🏃‍♂️💨")
+            time.sleep(1)
             dfs = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 future_to_query = {executor.submit(fetch_data, ctx, query): query for query in queries}
@@ -533,9 +534,9 @@ def main():
             df1 = pd.concat([dfs[queries[0]], dfs[queries[1]]])
             df2 = pd.concat([dfs[queries[2]], dfs[queries[3]]])
 
-            update_progress(40, "Working on column analysis...")
+            update_progress(40, "Working on Row Level Analysis...")
             differences, matched_but_different = compare_dataframes_by_key(df1, df2, key_column)
-            st.header("Column Analysis 🔎")
+            st.header("Row Level Analysis 🔎")
             plot_comparison_results(differences, matched_but_different, len(df1), len(df2))
             if not differences.empty:
                 st.dataframe(differences)
@@ -543,29 +544,30 @@ def main():
                 st.dataframe(matched_but_different)
                 
 
-            with st.expander("Column Queries 🐸"):
+            with st.expander("Queries 🐸"):
                 for query in generated_column_queries:
                     st.code(query, language="sql")
 
 
-            update_progress(50, "Column analysis completed ✅")
+            update_progress(50, "Row Level Analysis completed ✅")
             time.sleep(1)
             
-            update_progress(60, "Working on schema analysis...")
+            update_progress(60, "Working on Column Analysis...")
+            time.sleep(1)
             schema_comparison_results = compare_schemas(ctx, full_table_name1, full_table_name2)
-            st.header("Schema Analysis 🔎")
+            st.header("Column Analysis 🔎")
             st.dataframe(schema_comparison_results)
             plot_schema_comparison_results(schema_comparison_results)
             plot_schema_comparison_summary(schema_comparison_results)
             # Right after plotting schema comparison results:
             if generated_schema_queries:
-                with st.expander("Schema Queries 🤖"):
+                with st.expander("Queries 🤖"):
                     for query in generated_schema_queries:
                         st.code(query, language="sql")
-            update_progress(70, "Schema analysis completed ✅")
+            update_progress(70, "Column Analysis completed ✅")
             time.sleep(1)
 
-            update_progress(80, "Working on aggregate analysis...")
+            update_progress(80, "Working on Aggregate Analysis...")
             aggregate_results = perform_aggregate_analysis(ctx, full_table_name1, full_table_name2, filter_conditions)
             st.header("Aggregate Analysis 🔎")
             st.dataframe(aggregate_results)
@@ -573,7 +575,7 @@ def main():
             
             # After plotting the aggregate analysis summary:
             if generated_aggregate_queries:
-                with st.expander("Aggregate Queries 🥷"):
+                with st.expander("Queries 🥷"):
                     for query in generated_aggregate_queries:
                         st.code(query, language="sql")
 
