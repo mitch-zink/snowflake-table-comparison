@@ -27,10 +27,21 @@ def plot_comparison_results(
     rows_fetched_from_first,
     rows_fetched_from_second,
 ):
-    # Prepare data for the plot with additional row counts
+    # Check for dummy rows (indicating a complete match) and adjust counts
+    if not differences.empty and differences.iloc[0, 0] == "All rows match":
+        differences_count = 0
+    else:
+        differences_count = len(differences)
+
+    if not matched_but_different.empty and matched_but_different.iloc[0, 0] == "All rows match":
+        matched_but_different_count = 0
+    else:
+        matched_but_different_count = len(matched_but_different)
+
+    # Prepare data for the plot with adjusted counts
     counts = {
-        "Differences Between Tables": len(differences),
-        "Detailed Differences for Matched Rows": len(matched_but_different),
+        "Differences Between Tables": differences_count,
+        "Detailed Differences for Matched Rows": matched_but_different_count,
         "Rows Fetched from First Table": rows_fetched_from_first,
         "Rows Fetched from Second Table": rows_fetched_from_second,
     }
@@ -55,7 +66,6 @@ def plot_comparison_results(
     st.plotly_chart(
         fig, use_container_width=True
     )  # Ensure the chart uses the container width to fit properly
-
 
 # Function to compare two dataframes by a specific key column
 def compare_dataframes_by_key(df1, df2, key_column):
@@ -286,16 +296,24 @@ def get_check_description(column):
 
 # Function to define aggregate expressions based on the data type of a column.
 def aggregate_expression(column_name, data_type):
+    numeric_types = ["NUMBER", "FLOAT", "DECIMAL", "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT", "DOUBLE", "REAL"]
+    text_types = ["VARCHAR", "TEXT", "STRING", "CHAR", "CHARACTER", "NCHAR", "NVARCHAR"]
+    timestamp_types = ["DATE", "DATETIME", "TIMESTAMP", "TIMESTAMP_LTZ", "TIMESTAMP_NTZ", "TIMESTAMP_TZ"]
+
     # Handling numeric types with SUM, COUNT, and APPROX_COUNT_DISTINCT
-    if data_type.upper() in ["NUMBER", "FLOAT", "DECIMAL"]:
+    if data_type.upper() in numeric_types:
         return f"SUM({column_name}::NUMBER) AS total_{column_name.lower()}, COUNT({column_name}) AS count_{column_name.lower()}, APPROX_COUNT_DISTINCT({column_name}) AS approx_distinct_{column_name.lower()}"
     # Handling string types with COUNT and APPROX_COUNT_DISTINCT for unique values
-    elif data_type.upper() in ["VARCHAR", "TEXT"]:
+    elif data_type.upper() in text_types:
         return f"COUNT({column_name}) AS count_{column_name.lower()}, APPROX_COUNT_DISTINCT({column_name}) AS unique_{column_name.lower()}"
     # Handling date and timestamp types with MIN, MAX, and COUNT
-    elif data_type.upper() in ["DATE", "TIMESTAMP"]:
-        return f"MIN({column_name}) AS min_{column_name.lower()}, MAX({column_name}) AS max_{column_name.lower()}, COUNT({column_name}) AS count_{column_name.lower()}"
-    return None
+    elif data_type.upper() in timestamp_types:
+        # Ensure timestamps are converted to a standard format for proper comparison
+        return f"TO_CHAR(MIN({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS min_{column_name.lower()}, TO_CHAR(MAX({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS max_{column_name.lower()}, COUNT({column_name}) AS count_{column_name.lower()}"
+    else:
+        # For data types that do not match any of the above categories, return None
+        # This will exclude them from aggregate queries
+        return None
 
 
 # Function to execute an aggregate query on a table in Snowflake
@@ -414,12 +432,12 @@ def main():
 
     comparison_type = st.sidebar.radio(
         "Choose Comparison Type 🔄",
-        ["Value Level Analysis", "Column and Aggregate Analysis"],
+        ["Row and Value Level Analysis", "Column and Aggregate Analysis"],
     )
 
-    # Value Level Analysis Inputs
-    if comparison_type == "Value Level Analysis":
-        st.sidebar.subheader("Value Level Analysis Inputs")
+    # Row and Value Level Analysis Inputs
+    if comparison_type == "Row and Value Level Analysis":
+        st.sidebar.subheader("Row and Value Level Analysis Inputs")
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
             min_value=10,
@@ -469,8 +487,8 @@ def main():
             progress_bar.progress(20)
 
             # Run the selected comparison type
-            if comparison_type == "Value Level Analysis":
-                status_message.text("Fetching data for Value Level Analysis...")
+            if comparison_type == "Row and Value Level Analysis":
+                status_message.text("Fetching data for Row and Value Level Analysis...")
                 query_top1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} ASC LIMIT {row_count}"
                 query_bottom1 = f"SELECT * FROM {full_table_name1} ORDER BY {key_column} DESC LIMIT {row_count}"
                 query_top2 = f"SELECT * FROM {full_table_name2} ORDER BY {key_column} ASC LIMIT {row_count}"

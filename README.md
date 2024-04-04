@@ -12,6 +12,8 @@ This project contains a Streamlit app for comparing two tables in Snowflake to i
 - Feature | Better error handling and form validation for input values
 - Feature | Add filters to value level analysis
 - Bug | Value Level Analysis - The chart counts the dummy rows
+- Bug | Column and Aggregate Analysis - Dates aren't appearing in the Aggregate Analysis
+- Documentation | Rename the app name that appears at the top of the page from app to Table Comparison - Snowflake
 - Documentation | Refresh the documentation and readme
 
 ## Setup Instructions
