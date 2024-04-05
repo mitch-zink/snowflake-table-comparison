@@ -30,7 +30,9 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run Streamlit application
-      run: streamlit run app.py
+      run: |
+        timeout 5s streamlit run app.py &
+        sleep 1
       continue-on-error: true
 
     - name: Check if Streamlit app ran successfully
