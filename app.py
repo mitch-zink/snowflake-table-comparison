@@ -7,7 +7,7 @@ import pandas as pd  # Data manipulation
 import snowflake.connector  
 import streamlit as st  # UI
 import plotly.express as px  # Interactive visualizations
-import concurrent.futures  # Parallel execution of aggregate queries
+import concurrent.futures  # Parallel execution of queries
 import sqlparse  # Formatting SQL queries
 import time
 
