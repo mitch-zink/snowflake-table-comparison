@@ -167,25 +167,31 @@ def compare_schemas(ctx, full_table_name1, full_table_name2):
     
     return comparison_results
 
-
-
 # Function to fetch schema details from Snowflake
 def fetch_schema(ctx, catalog, schema, table_name, filter_conditions=""):
+    # First attempt with normal filter
     where_clause = f" AND {filter_conditions}" if filter_conditions else ""
     schema_query = f"""
     SELECT COLUMN_NAME, DATA_TYPE 
     FROM snowflake.account_usage.columns 
     WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL{where_clause};
     """
-    # Formatting schema fetch query for readability
+    df = pd.read_sql(schema_query, ctx)
+    # If no rows returned, attempt to fetch with max DELETED date using QUALIFY
+    if df.empty:
+        schema_query_with_deleted = f"""
+        SELECT COLUMN_NAME, DATA_TYPE 
+        FROM snowflake.account_usage.columns 
+        WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
+        {where_clause}
+        QUALIFY ROW_NUMBER() OVER(PARTITION BY COLUMN_NAME ORDER BY DELETED DESC) = 1;
+        """
+        df = pd.read_sql(schema_query_with_deleted, ctx)
     formatted_schema_query = sqlparse.format(schema_query, reindent=True, keyword_case="lower")
-
     # Check if the formatted schema query already exists in generated_schema_queries to avoid duplicates
     if formatted_schema_query not in generated_schema_queries:
         generated_schema_queries.append(formatted_schema_query)  # Add the formatted schema query if it's unique
-
-    # Returning the dataframe result of the schema query
-    return pd.read_sql(schema_query, ctx)
+    return df
 
 # Function to perform aggregate analysis between two tables in Snowflake
 def perform_aggregate_analysis(
