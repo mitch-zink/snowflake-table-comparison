@@ -437,7 +437,7 @@ def plot_aggregate_analysis_summary(aggregate_results):
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
-    st.title("❄️ Snowflake Table Comparison Tool")
+    st.header("❄️ Snowflake Table Comparison Tool")
 
     # Configuration sidebar setup
     st.sidebar.header("Configuration ⚙️")
