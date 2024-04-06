@@ -42,15 +42,15 @@ def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_condition
     where_clause = f" AND {filter_conditions}" if filter_conditions else ""
     schema_query = f"""
     SELECT COLUMN_NAME, DATA_TYPE 
-    FROM snowflake.account_usage.columns 
-    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' AND DELETED IS NULL{where_clause};
+    FROM {catalog}.information_schema.columns 
+    WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}' {where_clause};
     """
     df = pd.read_sql(schema_query, ctx)
     # If no rows returned, attempt to fetch with max DELETED date using QUALIFY
     if df.empty:
         schema_query_with_deleted = f"""
         SELECT COLUMN_NAME, DATA_TYPE 
-        FROM snowflake.account_usage.columns 
+        FROM {catalog}.information_schema.columns 
         WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
         {where_clause}
         QUALIFY ROW_NUMBER() OVER(PARTITION BY COLUMN_NAME ORDER BY DELETED DESC) = 1;
@@ -314,7 +314,6 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         test_counts,
         x="Test Result",
         y="Count",
-        title="Schema Comparison Results",
         color="Test Result",
         barmode="group",
     )
@@ -361,7 +360,6 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         test_counts,
         x="Test Result",
         y="Count",
-        title="Schema Comparison Results",
         color="Test Result",
         barmode="group",
     )
@@ -589,7 +587,6 @@ def plot_column_comparison_summary(column_comparison_results):
 
 # COLUMN ANALYSIS FUNCTIONS - END
 
-
 # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.header("❄️ Snowflake Table Comparison Tool")
@@ -665,7 +662,7 @@ def main():
 
         try:
             st.snow()
-            update_progress(10, "Connecting to Snowflake...")
+            update_progress(5, "Connecting to Snowflake 🏂")
             ctx = snowflake.connector.connect(
                 user=user,
                 account=account,
@@ -673,8 +670,6 @@ def main():
                 authenticator=authenticator,
                 warehouse=warehouse,
             )
-            update_progress(20, "Connected to Snowflake ✅")
-            time.sleep(3)
 
             base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
 
@@ -691,8 +686,6 @@ def main():
                 )
                 generated_row_queries.append(formatted_query)
 
-            update_progress(30, "Running Snowflake Queries 🏃‍♂️💨")
-            time.sleep(1)
             dfs = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 future_to_query = {
@@ -709,7 +702,7 @@ def main():
             df1 = pd.concat([dfs[queries[0]], dfs[queries[1]]])
             df2 = pd.concat([dfs[queries[2]], dfs[queries[3]]])
 
-            update_progress(40, "Working on Row Level Analysis...")
+            update_progress(15, "Working on Row Level Analysis 🏃‍♂️💨")
 
             st.header("Row Level Analysis 🔎")
 
@@ -729,11 +722,7 @@ def main():
                 generated_row_queries, "Row Level Analysis"
             )
 
-            update_progress(50, "Row Level Analysis completed ✅")
-
-            time.sleep(1)
-            update_progress(60, "Working on Column Analysis 🏃‍♂️💨")
-            time.sleep(1)
+            update_progress(40, "Working on Column Analysis 🏃‍♂️💨")
             column_comparison_results = column_analysis(
                 ctx, full_table_name1, full_table_name2
             )
@@ -744,10 +733,8 @@ def main():
             display_generated_queries_for_section(
                 generated_column_queries, "Column Analysis"
             )
-            update_progress(70, "Column Analysis completed ✅")
-            time.sleep(1)
 
-            update_progress(80, "Working on Aggregate Analysis 🏃‍♂️💨")
+            update_progress(60, "Working on Aggregate Analysis 🏃‍♂️💨")
             aggregate_results = perform_aggregate_analysis(
                 ctx, full_table_name1, full_table_name2, filter_conditions
             )
@@ -759,10 +746,7 @@ def main():
                 generated_aggregate_queries, "Aggregate Analysis"
             )
 
-            update_progress(99, "Aggregate analysis completed ✅")
-            time.sleep(1)
-
-            update_progress(95, "Wokring on Schema Analysis 🏃‍♂️💨")
+            update_progress(80, "Working on Schema Analysis 🏃‍♂️💨")
 
             st.header("Schema Analysis 🔎")
 
@@ -771,10 +755,7 @@ def main():
             )
             st.write(df_merged)
 
-            # Use the helper function to display SQL queries
             display_generated_queries_for_section(formatted_queries, "Schema Analysis")
-
-            update_progress(99, "Schema analysis completed ✅")
 
             update_progress(100, "Analysis completed ✅")
 
