@@ -19,6 +19,10 @@ generated_column_queries = []
 generated_row_queries = []
 generated_schema_queries = []
 
+# New global variables for flags
+show_meme_row_level_analysis = False
+show_meme_agg_analysis = False
+
 
 # Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
@@ -261,10 +265,9 @@ def plot_aggregate_analysis_summary(aggregate_results):
     )
 
     fig.update_traces(textinfo="percent+label", textposition="inside")
-    fig.update_layout(showlegend=True, title_x=0.5, title_text='')  # Remove the title
+    fig.update_layout(showlegend=True, title_x=0.5, title_text="")  # Remove the title
 
     st.plotly_chart(fig, use_container_width=True)
-
 
 
 # AGGREGATE ANALYSIS FUNCTIONS - END
@@ -550,6 +553,7 @@ def plot_column_comparison_summary(column_comparison_results):
 # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.header("❄️ Snowflake Table Comparison Tool")
+    meme_placeholder = st.empty()
 
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
@@ -719,6 +723,38 @@ def main():
 
             update_progress(100, "Analysis completed ✅")
 
+            # Initialize flags for aggregate, row level, column, and schema analysis
+            agg_analysis_flag = "❌"
+            row_level_analysis_flag = "❌"
+            column_analysis_flag = "⏳"  # Placeholder for column analysis
+            schema_analysis_flag = "⏳"  # Placeholder for schema analysis
+            
+
+            # Calculate the counts for differences and matched_but_different
+            differences_count = (
+                0
+                if not differences.empty and differences.iloc[0, 0] == "All rows match"
+                else len(differences)
+            )
+            matched_but_different_count = (
+                0
+                if not matched_but_different.empty
+                and matched_but_different.iloc[0, 0] == "All rows match"
+                else len(matched_but_different)
+            )
+
+            # Set the flag for aggregate analysis
+            if all(aggregate_results["Result"] == "Match"):
+                agg_analysis_flag = "✅"
+
+            # Set the flag for row level analysis
+            if differences_count == 0 and matched_but_different_count == 0:
+                row_level_analysis_flag = "✅"
+
+            # Update progress with the flags and line breaks
+            progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
+            update_progress(100, progress_message)
+            
         except Exception as e:
             update_progress(0, f"Failed to run analysis: {e}")
 
