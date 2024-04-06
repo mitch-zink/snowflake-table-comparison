@@ -141,7 +141,7 @@ def perform_aggregate_analysis(
     for column in results1.columns:
         val1, val2 = results1[column].iloc[0], results2[column].iloc[0]
         str_val1, str_val2 = str(val1), str(val2)
-        result = "Pass" if str_val1 == str_val2 else "Fail"
+        result = "Match" if str_val1 == str_val2 else "Mismatch"
 
         # Append the comparison results to a list
         comparison_results_list.append(
@@ -246,28 +246,33 @@ def agg_analysis_execute_aggregate_query(
 
 # Function to plot the results of aggregate analysis, indicating pass/fail status for each check
 def plot_aggregate_analysis_summary(aggregate_results):
-    results_count = (
-        aggregate_results["Result"]
-        .value_counts()
-        .reindex(["Pass", "Fail"], fill_value=0)
-        .reset_index()
-    )
+    results_count = aggregate_results["Result"].value_counts().reset_index()
     results_count.columns = ["Result", "Count"]
-    fig = px.bar(
+
+    # Convert Count column to string to use commas as thousand separators for better readability
+    results_count["Count"] = results_count["Count"].map(lambda x: "{:,}".format(x))
+
+    fig = px.pie(
         results_count,
-        x="Result",
-        y="Count",
-        labels={"Result": "Test Result"},
+        names="Result",
+        values="Count",
+        hole=0.4,
         color_discrete_sequence=["#2980b9"],
     )
+
+    fig.update_traces(textinfo="percent+label", textposition="inside")
+    fig.update_layout(showlegend=True, title_x=0.5, title_text='')  # Remove the title
+
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 # AGGREGATE ANALYSIS FUNCTIONS - END
 
 
 # SCHEMA ANALYSIS FUNCTIONS - START
-# Function to compare schemas of two tables in Snowflake and fetch schema details
+
+
 # Function to compare schemas of two tables in Snowflake and fetch schema details
 def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     def fetch_schema_info(ctx, database, schema):
@@ -284,8 +289,9 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     db_name_2, schema_name_2, _ = full_table_name_2.split(".")
 
     if db_name_1 == db_name_2 and schema_name_1 == schema_name_2:
-        # If the database and schema are the same, skip the schema analysis
-        st.warning("Skipping schema analysis because the database and schema are the same.")
+        st.warning(
+            "Skipping schema analysis because the database and schema are the same."
+        )
         return None, []
 
     df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
@@ -297,9 +303,9 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
     df_merged["Test"] = df_merged.apply(
         lambda row: (
-            "Pass"
+            "Match"
             if row[f"{schema_name_1} Row Count"] == row[f"{schema_name_2} Row Count"]
-            else "Fail"
+            else "Mismatch"
         ),
         axis=1,
     )
@@ -307,72 +313,15 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     test_counts = df_merged["Test"].value_counts().reset_index()
     test_counts.columns = ["Test Result", "Count"]
 
-    fig = px.bar(
+    # Donut Chart for Test Results
+    fig = px.pie(
         test_counts,
-        x="Test Result",
-        y="Count",
-        color="Test Result",
-        barmode="group",
+        names="Test Result",
+        values="Count",
+        hole=0.4,  # Creates a donut chart
+        color_discrete_sequence=["#2980b9"],
     )
-    st.plotly_chart(fig)
-
-    formatted_queries = [
-        sqlparse.format(query, reindent=True, keyword_case="lower")
-        for query in [query1, query2]
-    ]
-    return df_merged, formatted_queries
-
-
-
-# Function for schema analysis
-def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
-    db_name_1, schema_name_1, _ = full_table_name_1.split(".")
-    db_name_2, schema_name_2, _ = full_table_name_2.split(".")
-
-    if db_name_1 == db_name_2 and schema_name_1 == schema_name_2:
-        # If the database and schema are the same, skip the schema analysis
-        st.warning("Skipping schema analysis because the database and schema are the same.")
-        return None, []
-
-    def fetch_schema_info(ctx, database, schema):
-        query = f"""
-        SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
-        FROM "{database}".INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = '{schema}'
-        AND TABLE_TYPE = 'BASE TABLE';
-        """
-        df = pd.read_sql(query, ctx)
-        return df[["TABLE_NAME", "ROW_COUNT"]], query
-
-    db_name_1, schema_name_1, _ = full_table_name_1.split(".")
-    db_name_2, schema_name_2, _ = full_table_name_2.split(".")
-
-    df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
-    df_schema2, query2 = fetch_schema_info(ctx, db_name_2, schema_name_2)
-
-    df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
-    df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
-
-    df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
-    df_merged["Test"] = df_merged.apply(
-        lambda row: (
-            "Pass"
-            if row[f"{schema_name_1} Row Count"] == row[f"{schema_name_2} Row Count"]
-            else "Fail"
-        ),
-        axis=1,
-    )
-
-    test_counts = df_merged["Test"].value_counts().reset_index()
-    test_counts.columns = ["Test Result", "Count"]
-
-    fig = px.bar(
-        test_counts,
-        x="Test Result",
-        y="Count",
-        color="Test Result",
-        barmode="group",
-    )
+    fig.update_traces(textposition="inside", textinfo="percent+label")
     st.plotly_chart(fig)
 
     formatted_queries = [
@@ -738,35 +687,35 @@ def main():
                 ctx, full_table_name1, full_table_name2
             )
             st.header("Column Analysis 🔎")
-            st.dataframe(column_comparison_results)
             column_analysis_comparison_results(column_comparison_results)
             plot_column_comparison_summary(column_comparison_results)
+            st.dataframe(column_comparison_results)
             display_generated_queries_for_section(
                 generated_column_queries, "Column Analysis"
             )
 
-            update_progress(60, "Working on Aggregate Analysis 🏃‍♂️💨")
-            aggregate_results = perform_aggregate_analysis(
-                ctx, full_table_name1, full_table_name2, filter_conditions
-            )
-            st.header("Aggregate Analysis 🔎")
-            st.dataframe(aggregate_results)
-            plot_aggregate_analysis_summary(aggregate_results)
-
-            display_generated_queries_for_section(
-                generated_aggregate_queries, "Aggregate Analysis"
-            )
-
-            update_progress(80, "Working on Schema Analysis 🏃‍♂️💨")
+            update_progress(60, "Working on Schema Analysis 🏃‍♂️💨")
 
             st.header("Schema Analysis 🔎")
 
             df_merged, formatted_queries = schema_analysis(
                 ctx, full_table_name1, full_table_name2, st
             )
-            st.write(df_merged)
-
+            if df_merged is not None:
+                st.write(df_merged)
             display_generated_queries_for_section(formatted_queries, "Schema Analysis")
+
+            update_progress(80, "Working on Aggregate Analysis 🏃‍♂️💨")
+            aggregate_results = perform_aggregate_analysis(
+                ctx, full_table_name1, full_table_name2, filter_conditions
+            )
+            st.header("Aggregate Analysis 🔎")
+            plot_aggregate_analysis_summary(aggregate_results)
+            st.dataframe(aggregate_results)
+
+            display_generated_queries_for_section(
+                generated_aggregate_queries, "Aggregate Analysis"
+            )
 
             update_progress(100, "Analysis completed ✅")
 
