@@ -1,7 +1,7 @@
 """
 Description: This application compares two tables in Snowflake
 Author: Mitch Zink
-Last Updated: 4/3/2024
+Last Updated: 4/6/2024
 """
 
 import pandas as pd  # Data manipulation
@@ -90,9 +90,7 @@ def display_schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
         FROM "{database}".information_schema.tables
         WHERE TABLE_SCHEMA = '{schema}'
-        AND TABLE_TYPE = 'BASE TABLE'
-        ORDER BY TABLE_NAME
-        LIMIT 100;
+        AND TABLE_TYPE = 'BASE TABLE';
         """
         df = fetch_data(ctx, query)
 
@@ -355,9 +353,7 @@ def agg_analysis_execute_aggregate_query(
                SELECT * FROM table_agg;"""
     formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
     if formatted_query not in generated_aggregate_queries:  # Ensure uniqueness
-        generated_aggregate_queries.append(
-            formatted_query
-        )  
+        generated_aggregate_queries.append(formatted_query)
     return pd.read_sql(query, ctx)
 
 
@@ -437,9 +433,7 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
         FROM "{database}".information_schema.tables
         WHERE TABLE_SCHEMA = '{schema}'
-        AND TABLE_TYPE = 'BASE TABLE'
-        ORDER BY TABLE_NAME
-        LIMIT 100;
+        AND TABLE_TYPE = 'BASE TABLE';
         """
         df = pd.read_sql(query, ctx)
         # Store the schema query for displaying
@@ -685,7 +679,7 @@ def main():
 
             base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
 
-            queries = [  
+            queries = [
                 f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
                 f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}",
                 f"SELECT * FROM {full_table_name2} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
@@ -693,7 +687,9 @@ def main():
             ]
 
             for query in queries:
-                formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
+                formatted_query = sqlparse.format(
+                    query, reindent=True, keyword_case="lower"
+                )
                 generated_row_queries.append(formatted_query)
 
             update_progress(30, "Running Snowflake Queries 🏃‍♂️💨")
@@ -701,7 +697,7 @@ def main():
             dfs = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 future_to_query = {
-                    executor.submit(fetch_data, ctx, query): query for query in queries  
+                    executor.submit(fetch_data, ctx, query): query for query in queries
                 }
                 for future in concurrent.futures.as_completed(future_to_query):
                     query = future_to_query[future]
@@ -730,7 +726,9 @@ def main():
             if not matched_but_different.empty:
                 st.dataframe(matched_but_different)
 
-            display_generated_queries_for_section(generated_row_queries, "Row Level Analysis") 
+            display_generated_queries_for_section(
+                generated_row_queries, "Row Level Analysis"
+            )
 
             update_progress(50, "Row Level Analysis completed ✅")
 
@@ -768,7 +766,6 @@ def main():
             update_progress(95, "Wokring on Schema Analysis 🏃‍♂️💨")
 
             st.header("Schema Analysis 🔎")
-
             schema_comparison_df = display_schema_analysis(
                 ctx, full_table_name1, full_table_name2, st
             )
