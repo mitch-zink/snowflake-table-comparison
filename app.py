@@ -30,126 +30,12 @@ def display_generated_queries_for_section(queries, section_name):
                 st.code(query, language="sql")
 
 
-# Function to compare schemas of two tables in Snowflake and fetch schema details
-def column_analysis(ctx, full_table_name1, full_table_name2):
-    catalog1, schema1, table1 = full_table_name1.split(".")
-    catalog2, schema2, table2 = full_table_name2.split(".")
-
-    df_schema1 = agg_analysis_fetch_schema(ctx, catalog1, schema1, table1)
-    df_schema2 = agg_analysis_fetch_schema(ctx, catalog2, schema2, table2)
-
-    comparison_results = pd.merge(
-        df_schema1,
-        df_schema2,
-        on="COLUMN_NAME",
-        how="outer",
-        indicator="Column Presence",
-    )
-    comparison_results["Column Presence"] = comparison_results["Column Presence"].map(
-        {
-            "left_only": "Only in Table 1",
-            "right_only": "Only in Table 2",
-            "both": "In Both Tables",
-        }
-    )
-
-    comparison_results = comparison_results.rename(
-        columns={
-            "DATA_TYPE_x": "Data Type Table 1",
-            "DATA_TYPE_y": "Data Type Table 2",
-        }
-    )
-
-    comparison_results["Data Type Match"] = comparison_results.apply(
-        lambda row: (
-            "Match"
-            if row["Data Type Table 1"] == row["Data Type Table 2"]
-            else "Mismatch"
-        ),
-        axis=1,
-    )
-
-    # Set "Data Type Match" to "N/A" for columns not present in both tables
-    comparison_results.loc[
-        comparison_results["Column Presence"] != "In Both Tables", "Data Type Match"
-    ] = "N/A"
-
-    return comparison_results
-
-
 # Function to query data from Snowflake
 def fetch_data(ctx, query):
     return pd.read_sql(query, ctx)
 
 
-# Function to compare schemas of two tables in Snowflake and fetch schema details
-def display_schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
-    # Function to fetch schema information for a given schema name, now includes database filtering
-    def fetch_schema_info(ctx, database, schema, generated_schema_queries):
-        query = f"""
-        SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
-        FROM "{database}".information_schema.tables
-        WHERE TABLE_SCHEMA = '{schema}'
-        AND TABLE_TYPE = 'BASE TABLE';
-        """
-        df = fetch_data(ctx, query)
-
-        # Format and store the query for later display
-        formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
-        if formatted_query not in generated_schema_queries:
-            generated_schema_queries.append(formatted_query)
-
-        return df[["TABLE_NAME", "ROW_COUNT"]]
-
-    # Inside display_schema_analysis function:
-    db_name_1, schema_name_1, _ = full_table_name_1.split(".")
-    db_name_2, schema_name_2, _ = full_table_name_2.split(".")
-
-    # Fetch schema info for both schemas
-    df_schema1 = fetch_schema_info(
-        ctx, db_name_1, schema_name_1, generated_schema_queries
-    )  # Pass generated_schema_queries here
-    df_schema2 = fetch_schema_info(
-        ctx, db_name_2, schema_name_2, generated_schema_queries
-    )  # And here
-
-    # Rename the ROW_COUNT columns to distinguish between the two schemas
-    df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
-    df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
-
-    # Merge the two DataFrames on TABLE_NAME to align them side by side
-    df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
-
-    # Add a 'Test' column that checks if the row counts are equal (indicating a 'pass')
-    df_merged["Test"] = df_merged.apply(
-        lambda row: (
-            "Pass"
-            if row[f"{schema_name_1} Row Count"] == row[f"{schema_name_2} Row Count"]
-            else "Fail"
-        ),
-        axis=1,
-    )
-
-    # Aggregating test results
-    test_counts = df_merged["Test"].value_counts().reset_index()
-    test_counts.columns = ["Test Result", "Count"]
-
-    # Creating a Plotly bar chart for test counts
-    fig = px.bar(
-        test_counts,
-        x="Test Result",
-        y="Count",
-        color="Test Result",
-        barmode="group",
-    )
-
-    # Use Streamlit to render the Plotly chart
-    st.plotly_chart(fig)
-
-    # Display the merged DataFrame
-    return df_merged
-
-
+# AGGREGATE ANALYSIS FUNCTIONS - START
 # Function to fetch schema details from Snowflake
 def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_conditions=""):
     # First attempt with normal filter
@@ -357,55 +243,6 @@ def agg_analysis_execute_aggregate_query(
     return pd.read_sql(query, ctx)
 
 
-# Function to plot schema comparison results using a bar chart
-def column_analysis_comparison_results(column_comparison_results):
-    counts = column_comparison_results["Column Presence"].value_counts().reset_index()
-    counts.columns = ["Category", "Count"]
-    fig = px.bar(
-        counts,
-        x="Category",
-        y="Count",
-        text="Count",
-        color_discrete_sequence=["#2980b9"],
-    )
-    fig.update_traces(texttemplate="%{text}", textposition="outside")
-    fig.update_layout(
-        xaxis_title="Column Presence",
-        yaxis_title="Count",
-        uniformtext_minsize=8,
-        uniformtext_mode="hide",
-        showlegend=False,
-    )  # Hide the legend since all bars are the same color
-    st.plotly_chart(fig, use_container_width=True)
-
-
-# Function to plot a summary of the schema comparison focusing on data type matches/mismatches
-def plot_column_comparison_summary(column_comparison_results):
-    data_type_counts = (
-        column_comparison_results["Data Type Match"]
-        .value_counts()
-        .reindex(["Match", "Mismatch"], fill_value=0)
-        .reset_index()
-    )
-    data_type_counts.columns = ["Match Status", "Count"]
-    fig_data_types = px.bar(
-        data_type_counts,
-        x="Match Status",
-        y="Count",
-        text="Count",
-        color_discrete_sequence=["#2980b9"],
-    )
-    fig_data_types.update_traces(texttemplate="%{text}", textposition="outside")
-    fig_data_types.update_layout(
-        xaxis_title="Data Type Match",
-        yaxis_title="Count",
-        uniformtext_minsize=8,
-        uniformtext_mode="hide",
-        legend_title="Match Status",
-    )
-    st.plotly_chart(fig_data_types, use_container_width=True)
-
-
 # Function to plot the results of aggregate analysis, indicating pass/fail status for each check
 def plot_aggregate_analysis_summary(aggregate_results):
     results_count = (
@@ -423,8 +260,9 @@ def plot_aggregate_analysis_summary(aggregate_results):
         color_discrete_sequence=["#2980b9"],
     )
     st.plotly_chart(fig, use_container_width=True)
+# AGGREGATE ANALYSIS FUNCTIONS - END
 
-
+# SCHEMA ANALYSIS FUNCTIONS - START
 # Function to compare schemas of two tables in Snowflake and fetch schema details
 def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     # Function to fetch schema information for a given schema name, now includes database filtering
@@ -481,7 +319,75 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
 
     return df_merged
 
+# Function to compare schemas of two tables in Snowflake and fetch schema details
+def display_schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
+    # Function to fetch schema information for a given schema name, now includes database filtering
+    def fetch_schema_info(ctx, database, schema, generated_schema_queries):
+        query = f"""
+        SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
+        FROM "{database}".information_schema.tables
+        WHERE TABLE_SCHEMA = '{schema}'
+        AND TABLE_TYPE = 'BASE TABLE';
+        """
+        df = fetch_data(ctx, query)
 
+        # Format and store the query for later display
+        formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
+        if formatted_query not in generated_schema_queries:
+            generated_schema_queries.append(formatted_query)
+
+        return df[["TABLE_NAME", "ROW_COUNT"]]
+
+    # Inside display_schema_analysis function:
+    db_name_1, schema_name_1, _ = full_table_name_1.split(".")
+    db_name_2, schema_name_2, _ = full_table_name_2.split(".")
+
+    # Fetch schema info for both schemas
+    df_schema1 = fetch_schema_info(
+        ctx, db_name_1, schema_name_1, generated_schema_queries
+    )  # Pass generated_schema_queries here
+    df_schema2 = fetch_schema_info(
+        ctx, db_name_2, schema_name_2, generated_schema_queries
+    )  # And here
+
+    # Rename the ROW_COUNT columns to distinguish between the two schemas
+    df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
+    df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
+
+    # Merge the two DataFrames on TABLE_NAME to align them side by side
+    df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
+
+    # Add a 'Test' column that checks if the row counts are equal (indicating a 'pass')
+    df_merged["Test"] = df_merged.apply(
+        lambda row: (
+            "Pass"
+            if row[f"{schema_name_1} Row Count"] == row[f"{schema_name_2} Row Count"]
+            else "Fail"
+        ),
+        axis=1,
+    )
+
+    # Aggregating test results
+    test_counts = df_merged["Test"].value_counts().reset_index()
+    test_counts.columns = ["Test Result", "Count"]
+
+    # Creating a Plotly bar chart for test counts
+    fig = px.bar(
+        test_counts,
+        x="Test Result",
+        y="Count",
+        color="Test Result",
+        barmode="group",
+    )
+
+    # Use Streamlit to render the Plotly chart
+    st.plotly_chart(fig)
+
+    # Display the merged DataFrame
+    return df_merged
+# SCHEMA ANALYSIS FUNCTIONS - END
+
+# ROW LEVEL ANALYSIS FUNCTIONS - START
 # Function to plot the comparison results using a bar chart
 def row_level_analysis_plot_comparison_results(
     differences,
@@ -589,7 +495,105 @@ def row_level_analysis_compare_dataframes_by_key(df1, df2, key_column):
 
     matched_but_different = pd.DataFrame(diff_data)
     return differences, matched_but_different
+# ROW LEVEL ANALYSIS FUNCTIONS - END
 
+
+# COLUMN ANALYSIS FUNCTIONS - START 
+# Function to compare schemas of two tables in Snowflake and fetch schema details
+def column_analysis(ctx, full_table_name1, full_table_name2):
+    catalog1, schema1, table1 = full_table_name1.split(".")
+    catalog2, schema2, table2 = full_table_name2.split(".")
+
+    df_schema1 = agg_analysis_fetch_schema(ctx, catalog1, schema1, table1)
+    df_schema2 = agg_analysis_fetch_schema(ctx, catalog2, schema2, table2)
+
+    comparison_results = pd.merge(
+        df_schema1,
+        df_schema2,
+        on="COLUMN_NAME",
+        how="outer",
+        indicator="Column Presence",
+    )
+    comparison_results["Column Presence"] = comparison_results["Column Presence"].map(
+        {
+            "left_only": "Only in Table 1",
+            "right_only": "Only in Table 2",
+            "both": "In Both Tables",
+        }
+    )
+
+    comparison_results = comparison_results.rename(
+        columns={
+            "DATA_TYPE_x": "Data Type Table 1",
+            "DATA_TYPE_y": "Data Type Table 2",
+        }
+    )
+
+    comparison_results["Data Type Match"] = comparison_results.apply(
+        lambda row: (
+            "Match"
+            if row["Data Type Table 1"] == row["Data Type Table 2"]
+            else "Mismatch"
+        ),
+        axis=1,
+    )
+
+    # Set "Data Type Match" to "N/A" for columns not present in both tables
+    comparison_results.loc[
+        comparison_results["Column Presence"] != "In Both Tables", "Data Type Match"
+    ] = "N/A"
+
+    return comparison_results
+
+
+# Function to plot schema comparison results using a bar chart
+def column_analysis_comparison_results(column_comparison_results):
+    counts = column_comparison_results["Column Presence"].value_counts().reset_index()
+    counts.columns = ["Category", "Count"]
+    fig = px.bar(
+        counts,
+        x="Category",
+        y="Count",
+        text="Count",
+        color_discrete_sequence=["#2980b9"],
+    )
+    fig.update_traces(texttemplate="%{text}", textposition="outside")
+    fig.update_layout(
+        xaxis_title="Column Presence",
+        yaxis_title="Count",
+        uniformtext_minsize=8,
+        uniformtext_mode="hide",
+        showlegend=False,
+    )  # Hide the legend since all bars are the same color
+    st.plotly_chart(fig, use_container_width=True)
+
+
+# Function to plot a summary of the schema comparison focusing on data type matches/mismatches
+def plot_column_comparison_summary(column_comparison_results):
+    data_type_counts = (
+        column_comparison_results["Data Type Match"]
+        .value_counts()
+        .reindex(["Match", "Mismatch"], fill_value=0)
+        .reset_index()
+    )
+    data_type_counts.columns = ["Match Status", "Count"]
+    fig_data_types = px.bar(
+        data_type_counts,
+        x="Match Status",
+        y="Count",
+        text="Count",
+        color_discrete_sequence=["#2980b9"],
+    )
+    fig_data_types.update_traces(texttemplate="%{text}", textposition="outside")
+    fig_data_types.update_layout(
+        xaxis_title="Data Type Match",
+        yaxis_title="Count",
+        uniformtext_minsize=8,
+        uniformtext_mode="hide",
+        legend_title="Match Status",
+    )
+    st.plotly_chart(fig_data_types, use_container_width=True)
+# COLUMN ANALYSIS FUNCTIONS - END 
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
