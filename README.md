@@ -21,6 +21,9 @@ Assesses aggregate data (like sums and counts) to check for data consistency at 
 ## Roadmap
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
 - Documentation | Rename the app name that appears at the top of the page from app to Table Comparison - Snowflake
+- Feature | Performance enhancement to run everything at 1 time 
+- Chore | 1 function for each section for better readability. Less code in main()
+- Feature | Width of dataframes and charts should be wider or maybe dynamically fit the page
 
 ## Setup Instructions
 
