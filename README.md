@@ -18,11 +18,12 @@ Examines columns to identify differences in column presence and data types.
 ### 3. Aggregate Analysis
 Assesses aggregate data (like sums and counts) to check for data consistency at a higher level.
 
+### 4. Schema Analysis
+This section compares table row counts between schemas.
+
 ## Roadmap
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
 - Documentation | Rename the app name that appears at the top of the page from app to Table Comparison - Snowflake
-- Feature | Performance enhancement to run everything at 1 time 
-- Chore | 1 function for each section for better readability. Less code in main()
 - Feature | Width of dataframes and charts should be wider or maybe dynamically fit the page
 
 ## Setup Instructions
