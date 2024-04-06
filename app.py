@@ -260,7 +260,10 @@ def plot_aggregate_analysis_summary(aggregate_results):
         color_discrete_sequence=["#2980b9"],
     )
     st.plotly_chart(fig, use_container_width=True)
+
+
 # AGGREGATE ANALYSIS FUNCTIONS - END
+
 
 # SCHEMA ANALYSIS FUNCTIONS - START
 # Function to compare schemas of two tables in Snowflake and fetch schema details
@@ -319,45 +322,29 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
 
     return df_merged
 
-# Function to compare schemas of two tables in Snowflake and fetch schema details
-def display_schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
-    # Function to fetch schema information for a given schema name, now includes database filtering
-    def fetch_schema_info(ctx, database, schema, generated_schema_queries):
+
+# Function for schema analysis
+def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
+    def fetch_schema_info(ctx, database, schema):
         query = f"""
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
-        FROM "{database}".information_schema.tables
+        FROM "{database}".INFORMATION_SCHEMA.TABLES
         WHERE TABLE_SCHEMA = '{schema}'
         AND TABLE_TYPE = 'BASE TABLE';
         """
-        df = fetch_data(ctx, query)
+        df = pd.read_sql(query, ctx)
+        return df[["TABLE_NAME", "ROW_COUNT"]], query
 
-        # Format and store the query for later display
-        formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
-        if formatted_query not in generated_schema_queries:
-            generated_schema_queries.append(formatted_query)
-
-        return df[["TABLE_NAME", "ROW_COUNT"]]
-
-    # Inside display_schema_analysis function:
     db_name_1, schema_name_1, _ = full_table_name_1.split(".")
     db_name_2, schema_name_2, _ = full_table_name_2.split(".")
 
-    # Fetch schema info for both schemas
-    df_schema1 = fetch_schema_info(
-        ctx, db_name_1, schema_name_1, generated_schema_queries
-    )  # Pass generated_schema_queries here
-    df_schema2 = fetch_schema_info(
-        ctx, db_name_2, schema_name_2, generated_schema_queries
-    )  # And here
+    df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
+    df_schema2, query2 = fetch_schema_info(ctx, db_name_2, schema_name_2)
 
-    # Rename the ROW_COUNT columns to distinguish between the two schemas
     df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
     df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
 
-    # Merge the two DataFrames on TABLE_NAME to align them side by side
     df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
-
-    # Add a 'Test' column that checks if the row counts are equal (indicating a 'pass')
     df_merged["Test"] = df_merged.apply(
         lambda row: (
             "Pass"
@@ -367,25 +354,28 @@ def display_schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         axis=1,
     )
 
-    # Aggregating test results
     test_counts = df_merged["Test"].value_counts().reset_index()
     test_counts.columns = ["Test Result", "Count"]
 
-    # Creating a Plotly bar chart for test counts
     fig = px.bar(
         test_counts,
         x="Test Result",
         y="Count",
+        title="Schema Comparison Results",
         color="Test Result",
         barmode="group",
     )
-
-    # Use Streamlit to render the Plotly chart
     st.plotly_chart(fig)
 
-    # Display the merged DataFrame
-    return df_merged
+    formatted_queries = [
+        sqlparse.format(query, reindent=True, keyword_case="lower")
+        for query in [query1, query2]
+    ]
+    return df_merged, formatted_queries
+
+
 # SCHEMA ANALYSIS FUNCTIONS - END
+
 
 # ROW LEVEL ANALYSIS FUNCTIONS - START
 # Function to plot the comparison results using a bar chart
@@ -495,10 +485,12 @@ def row_level_analysis_compare_dataframes_by_key(df1, df2, key_column):
 
     matched_but_different = pd.DataFrame(diff_data)
     return differences, matched_but_different
+
+
 # ROW LEVEL ANALYSIS FUNCTIONS - END
 
 
-# COLUMN ANALYSIS FUNCTIONS - START 
+# COLUMN ANALYSIS FUNCTIONS - START
 # Function to compare schemas of two tables in Snowflake and fetch schema details
 def column_analysis(ctx, full_table_name1, full_table_name2):
     catalog1, schema1, table1 = full_table_name1.split(".")
@@ -593,7 +585,10 @@ def plot_column_comparison_summary(column_comparison_results):
         legend_title="Match Status",
     )
     st.plotly_chart(fig_data_types, use_container_width=True)
-# COLUMN ANALYSIS FUNCTIONS - END 
+
+
+# COLUMN ANALYSIS FUNCTIONS - END
+
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
@@ -770,18 +765,14 @@ def main():
             update_progress(95, "Wokring on Schema Analysis 🏃‍♂️💨")
 
             st.header("Schema Analysis 🔎")
-            schema_comparison_df = display_schema_analysis(
+
+            df_merged, formatted_queries = schema_analysis(
                 ctx, full_table_name1, full_table_name2, st
             )
+            st.write(df_merged)
 
-            if not schema_comparison_df.empty:
-                st.dataframe(schema_comparison_df)
-            else:
-                st.write("No matching tables found in the provided schemas.")
-
-            display_generated_queries_for_section(
-                generated_schema_queries, "Schema Analysis"
-            )
+            # Use the helper function to display SQL queries
+            display_generated_queries_for_section(formatted_queries, "Schema Analysis")
 
             update_progress(99, "Schema analysis completed ✅")
 
