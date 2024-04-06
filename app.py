@@ -20,6 +20,7 @@ generated_row_queries = []
 generated_schema_queries = []
 
 
+# Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
     """
     Function to display generated queries for a specific analysis section.
@@ -586,6 +587,7 @@ def plot_column_comparison_summary(column_comparison_results):
 
 
 # COLUMN ANALYSIS FUNCTIONS - END
+
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
