@@ -51,7 +51,7 @@ def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_condition
     if df.empty:
         schema_query_with_deleted = f"""
         SELECT COLUMN_NAME, DATA_TYPE 
-        FROM {catalog}.information_schema.columns 
+        FROM snowflake.account_usage.columns 
         WHERE TABLE_CATALOG = '{catalog}' AND TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
         {where_clause}
         QUALIFY ROW_NUMBER() OVER(PARTITION BY COLUMN_NAME ORDER BY DELETED DESC) = 1;
@@ -268,32 +268,28 @@ def plot_aggregate_analysis_summary(aggregate_results):
 
 # SCHEMA ANALYSIS FUNCTIONS - START
 # Function to compare schemas of two tables in Snowflake and fetch schema details
+# Function to compare schemas of two tables in Snowflake and fetch schema details
 def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
-    # Function to fetch schema information for a given schema name, now includes database filtering
-    def fetch_schema_info(ctx, database, schema, generated_column_queries):
+    def fetch_schema_info(ctx, database, schema):
         query = f"""
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
-        FROM "{database}".information_schema.tables
+        FROM "{database}".INFORMATION_SCHEMA.TABLES
         WHERE TABLE_SCHEMA = '{schema}'
         AND TABLE_TYPE = 'BASE TABLE';
         """
         df = pd.read_sql(query, ctx)
-        # Store the schema query for displaying
-        formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
-        if formatted_query not in generated_column_queries:
-            generated_column_queries.append(formatted_query)
-        return df[["TABLE_NAME", "ROW_COUNT"]]
+        return df[["TABLE_NAME", "ROW_COUNT"]], query
 
     db_name_1, schema_name_1, _ = full_table_name_1.split(".")
     db_name_2, schema_name_2, _ = full_table_name_2.split(".")
 
-    # Make sure to pass the global list where we store queries
-    df_schema1 = fetch_schema_info(
-        ctx, db_name_1, schema_name_1, generated_column_queries
-    )
-    df_schema2 = fetch_schema_info(
-        ctx, db_name_2, schema_name_2, generated_column_queries
-    )
+    if db_name_1 == db_name_2 and schema_name_1 == schema_name_2:
+        # If the database and schema are the same, skip the schema analysis
+        st.warning("Skipping schema analysis because the database and schema are the same.")
+        return None, []
+
+    df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
+    df_schema2, query2 = fetch_schema_info(ctx, db_name_2, schema_name_2)
 
     df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
     df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
@@ -320,11 +316,24 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     )
     st.plotly_chart(fig)
 
-    return df_merged
+    formatted_queries = [
+        sqlparse.format(query, reindent=True, keyword_case="lower")
+        for query in [query1, query2]
+    ]
+    return df_merged, formatted_queries
+
 
 
 # Function for schema analysis
 def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
+    db_name_1, schema_name_1, _ = full_table_name_1.split(".")
+    db_name_2, schema_name_2, _ = full_table_name_2.split(".")
+
+    if db_name_1 == db_name_2 and schema_name_1 == schema_name_2:
+        # If the database and schema are the same, skip the schema analysis
+        st.warning("Skipping schema analysis because the database and schema are the same.")
+        return None, []
+
     def fetch_schema_info(ctx, database, schema):
         query = f"""
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
