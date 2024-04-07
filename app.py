@@ -552,9 +552,10 @@ def plot_column_comparison_summary(column_comparison_results):
 
 # Main function to run the Snowflake Table Comparison Tool
 def main():
+    st.set_page_config(layout="wide")
     st.header("❄️ Snowflake Table Comparison Tool")
     meme_placeholder = st.empty()
-
+    
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
