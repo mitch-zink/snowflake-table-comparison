@@ -557,11 +557,16 @@ def display_column_analysis_charts(column_comparison_results):
 # COLUMN ANALYSIS FUNCTIONS - END
 
 
-# Main function to run the Snowflake Table Comparison Tool
+# # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.set_page_config(layout="wide")
     st.header("❄️ Snowflake Table Comparison Tool")
-      
+    # Initialize flags for aggregate, row level, column, and schema analysis
+    agg_analysis_flag = "❌"
+    row_level_analysis_flag = "❌"
+    column_analysis_flag = "⏳"  # Placeholder for column analysis
+    schema_analysis_flag = "⏳"  # Placeholder for schema analysis
+                 
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
@@ -676,92 +681,101 @@ def main():
             update_progress(15, "Working on Row Level Analysis 🏃‍♂️💨")
 
             st.header("Row Level Analysis 🔎")
+            with st.spinner(' 🏂'):
+                differences, matched_but_different = (
+                    row_level_analysis_compare_dataframes_by_key(df1, df2, key_column)
+                )
 
-            differences, matched_but_different = (
-                row_level_analysis_compare_dataframes_by_key(df1, df2, key_column)
-            )
+                row_level_analysis_plot_comparison_results(
+                    differences, matched_but_different, len(df1), len(df2)
+                )
 
-            row_level_analysis_plot_comparison_results(
-                differences, matched_but_different, len(df1), len(df2)
-            )
-            
-            if not differences.empty:
-                st.subheader("Row Discrepancies")  
-                st.dataframe(differences)
-            if not matched_but_different.empty:
-                st.subheader("Inconsistencies Within Matched Rows")  
-                st.dataframe(matched_but_different)
+                if not differences.empty and not differences.iloc[0, 0] == "All rows match":
+                    with st.expander("Row Discrepancies ⚠️"):
+                        st.dataframe(differences)
 
-            display_generated_queries_for_section(
-                generated_row_queries, "Row Level Analysis"
-            )
+                if not matched_but_different.empty and not matched_but_different.iloc[0, 0] == "All rows match":
+                    with st.expander("Inconsistencies Within Matched Rows ⚠️"):
+                        st.dataframe(matched_but_different)
+
+                display_generated_queries_for_section(
+                    generated_row_queries, ""
+                )
+                
+                # Calculate the counts for differences and matched_but_different
+                differences_count = (
+                    0
+                    if not differences.empty and differences.iloc[0, 0] == "All rows match"
+                    else len(differences)
+                )
+                matched_but_different_count = (
+                    0
+                    if not matched_but_different.empty
+                    and matched_but_different.iloc[0, 0] == "All rows match"
+                    else len(matched_but_different)
+                )
+                
+                # Set the flag for row level analysis
+                if differences_count == 0 and matched_but_different_count == 0:
+                    row_level_analysis_flag = "✅"
+
+                # Update progress with the flags and line breaks
+                progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
+
 
             update_progress(40, "Working on Column Analysis 🏃‍♂️💨")
-            column_comparison_results = column_analysis(
-                ctx, full_table_name1, full_table_name2
-            )
             st.header("Column Analysis 🔎")
-            column_comparison_results = column_analysis(ctx, full_table_name1, full_table_name2)
-            display_column_analysis_charts(column_comparison_results)
-            st.dataframe(column_comparison_results)
-            display_generated_queries_for_section(generated_column_queries, "Column Analysis")
+            with st.spinner(' 🏂'):
+                column_comparison_results = column_analysis(
+                    ctx, full_table_name1, full_table_name2
+                )
+                column_comparison_results = column_analysis(ctx, full_table_name1, full_table_name2)
+                display_column_analysis_charts(column_comparison_results)
+
+            with st.expander("Results 📊"):
+                st.dataframe(column_comparison_results)
+
+            display_generated_queries_for_section(generated_column_queries, "")
 
 
             update_progress(60, "Working on Schema Analysis 🏃‍♂️💨")
+            
 
             st.header("Schema Analysis 🔎")
 
-            df_merged, formatted_queries = schema_analysis(
-                ctx, full_table_name1, full_table_name2, st
-            )
-            if df_merged is not None:
-                st.write(df_merged)
-            display_generated_queries_for_section(formatted_queries, "Schema Analysis")
+            with st.spinner(' 🏂'):
 
-            update_progress(80, "Working on Aggregate Analysis 🏃‍♂️💨")
-            aggregate_results = perform_aggregate_analysis(
-                ctx, full_table_name1, full_table_name2, filter_conditions
-            )
+                df_merged, formatted_queries = schema_analysis(
+                    ctx, full_table_name1, full_table_name2, st
+                )
+                with st.expander("Results 📊"):
+                    if df_merged is not None:
+                        st.write(df_merged)
+                display_generated_queries_for_section(formatted_queries, "")
+
+            update_progress(80, "Working on Aggregate Analysis 🏃‍♂️💨")   
             st.header("Aggregate Analysis 🔎")
-            plot_aggregate_analysis_summary(aggregate_results)
-            st.dataframe(aggregate_results)
+            
+            with st.spinner(' 🏂'):
+                aggregate_results = perform_aggregate_analysis(
+                    ctx, full_table_name1, full_table_name2, filter_conditions
+                )
+                plot_aggregate_analysis_summary(aggregate_results)
+                with st.expander("Results 📊"):
+                    st.dataframe(aggregate_results)
+                display_generated_queries_for_section(
+                    generated_aggregate_queries, ""
+                )
 
-            display_generated_queries_for_section(
-                generated_aggregate_queries, "Aggregate Analysis"
-            )
-
+                # Set the flag for aggregate analysis
+                if all(aggregate_results["Result"] == "Match"):
+                    agg_analysis_flag = "✅"
+                    
+                # Update progress with the flags and line breaks
+                progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
+            
             update_progress(100, "Analysis completed ✅")
 
-            # Initialize flags for aggregate, row level, column, and schema analysis
-            agg_analysis_flag = "❌"
-            row_level_analysis_flag = "❌"
-            column_analysis_flag = "⏳"  # Placeholder for column analysis
-            schema_analysis_flag = "⏳"  # Placeholder for schema analysis
-            
-
-            # Calculate the counts for differences and matched_but_different
-            differences_count = (
-                0
-                if not differences.empty and differences.iloc[0, 0] == "All rows match"
-                else len(differences)
-            )
-            matched_but_different_count = (
-                0
-                if not matched_but_different.empty
-                and matched_but_different.iloc[0, 0] == "All rows match"
-                else len(matched_but_different)
-            )
-
-            # Set the flag for aggregate analysis
-            if all(aggregate_results["Result"] == "Match"):
-                agg_analysis_flag = "✅"
-
-            # Set the flag for row level analysis
-            if differences_count == 0 and matched_but_different_count == 0:
-                row_level_analysis_flag = "✅"
-
-            # Update progress with the flags and line breaks
-            progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
             update_progress(100, progress_message)
             
         except Exception as e:
