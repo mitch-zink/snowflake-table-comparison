@@ -316,7 +316,7 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     test_counts = df_merged["Test"].value_counts().reset_index()
     test_counts.columns = ["Test Result", "Count"]
 
-    # Donut Chart for Test Results
+    # Donut Chart for Test Resultscolumn_analysis_comparison_results
     fig = px.pie(
         test_counts,
         names="Test Result",
@@ -325,7 +325,7 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         color_discrete_sequence=["#2980b9"],
     )
     fig.update_traces(textposition="inside", textinfo="percent+label")
-    st.plotly_chart(fig)
+    st.plotly_chart(fig,  use_container_width=True)
 
     formatted_queries = [
         sqlparse.format(query, reindent=True, keyword_case="lower")
@@ -516,9 +516,8 @@ def column_analysis_comparison_results(column_comparison_results):
         uniformtext_minsize=8,
         uniformtext_mode="hide",
         showlegend=False,
-    )  # Hide the legend since all bars are the same color
-    st.plotly_chart(fig, use_container_width=True)
-
+    )
+    return fig  # Return the figure instead of directly displaying it
 
 # Function to plot a summary of the schema comparison focusing on data type matches/mismatches
 def plot_column_comparison_summary(column_comparison_results):
@@ -544,7 +543,20 @@ def plot_column_comparison_summary(column_comparison_results):
         uniformtext_mode="hide",
         legend_title="Match Status",
     )
-    st.plotly_chart(fig_data_types, use_container_width=True)
+    return fig_data_types  # Return the figure instead of directly displaying it
+
+# Function to display column analysis charts side by side
+def display_column_analysis_charts(column_comparison_results):
+    # Generate both figures for the column analysis
+    fig1 = column_analysis_comparison_results(column_comparison_results)
+    fig2 = plot_column_comparison_summary(column_comparison_results)
+
+    # Use Streamlit's columns feature to display figures side by side
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(fig1, use_container_width=True)
+    with col2:
+        st.plotly_chart(fig2, use_container_width=True)
 
 
 # COLUMN ANALYSIS FUNCTIONS - END
@@ -554,8 +566,7 @@ def plot_column_comparison_summary(column_comparison_results):
 def main():
     st.set_page_config(layout="wide")
     st.header("❄️ Snowflake Table Comparison Tool")
-    meme_placeholder = st.empty()
-    
+      
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
@@ -692,12 +703,11 @@ def main():
                 ctx, full_table_name1, full_table_name2
             )
             st.header("Column Analysis 🔎")
-            column_analysis_comparison_results(column_comparison_results)
-            plot_column_comparison_summary(column_comparison_results)
+            column_comparison_results = column_analysis(ctx, full_table_name1, full_table_name2)
+            display_column_analysis_charts(column_comparison_results)
             st.dataframe(column_comparison_results)
-            display_generated_queries_for_section(
-                generated_column_queries, "Column Analysis"
-            )
+            display_generated_queries_for_section(generated_column_queries, "Column Analysis")
+
 
             update_progress(60, "Working on Schema Analysis 🏃‍♂️💨")
 
