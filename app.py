@@ -19,6 +19,11 @@ generated_column_queries = []
 generated_row_queries = []
 generated_schema_queries = []
 
+# New global variables for flags
+show_meme_row_level_analysis = False
+show_meme_agg_analysis = False
+
+
 # Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
     """
@@ -356,8 +361,8 @@ def row_level_analysis_plot_comparison_results(
 
     # Prepare data for the plot with adjusted counts
     counts = {
-        "Differences Between Tables": differences_count,
-        "Detailed Differences for Matched Rows": matched_but_different_count,
+        "Table Row Discrepancies": differences_count,  # Renamed from "Differences Between Tables"
+        "Inconsistencies Within Matched Rows": matched_but_different_count,  # Renamed from "Detailed Differences for Matched Rows"
         "Rows Fetched from Table 1": rows_fetched_from_first,
         "Rows Fetched from Table 2": rows_fetched_from_second,
     }
@@ -684,9 +689,12 @@ def main():
             row_level_analysis_plot_comparison_results(
                 differences, matched_but_different, len(df1), len(df2)
             )
+            
             if not differences.empty:
+                st.subheader("Row Discrepancies")  
                 st.dataframe(differences)
             if not matched_but_different.empty:
+                st.subheader("Inconsistencies Within Matched Rows")  
                 st.dataframe(matched_but_different)
 
             display_generated_queries_for_section(
