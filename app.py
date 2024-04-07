@@ -562,7 +562,12 @@ def display_column_analysis_charts(column_comparison_results):
 
 # # Main function to run the Snowflake Table Comparison Tool
 def main():
-    st.set_page_config(layout="wide")
+    st.set_page_config(
+        page_title="Snowflake Table Comparison Tool",
+        page_icon="❄️",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     st.title("❄️ Snowflake Table Comparison Tool")
     # Initialize flags for aggregate, row level, column, and schema analysis
     agg_analysis_flag = "❌"
@@ -640,7 +645,7 @@ def main():
             return
 
         try:
-            st.snow()
+            # st.snow()
             update_progress(5, "Connecting to Snowflake 🏂")
             ctx = snowflake.connector.connect(
                 user=user,
@@ -681,7 +686,7 @@ def main():
             df1 = pd.concat([dfs[queries[0]], dfs[queries[1]]])
             df2 = pd.concat([dfs[queries[2]], dfs[queries[3]]])
 
-            update_progress(15, "Working on Row Level Analysis 🏃‍♂️💨")
+            update_progress(15, "Working on Row Level Analysis 🏂")
 
             st.header("Row Level Analysis 🔎")
             with st.spinner(' 🏂'):
@@ -726,7 +731,7 @@ def main():
                 progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
 
 
-            update_progress(40, "Working on Column Analysis 🏃‍♂️💨")
+            update_progress(40, "Working on Column Analysis 🏂")
             st.header("Column Analysis 🔎")
             with st.spinner(' 🏂'):
                 column_comparison_results = column_analysis(
@@ -741,7 +746,7 @@ def main():
             display_generated_queries_for_section(generated_column_queries, "")
 
 
-            update_progress(60, "Working on Schema Analysis 🏃‍♂️💨")
+            update_progress(60, "Working on Schema Analysis 🏂")
             
 
             st.header("Schema Analysis 🔎")
@@ -756,7 +761,7 @@ def main():
                         st.write(df_merged)
                 display_generated_queries_for_section(formatted_queries, "")
 
-            update_progress(80, "Working on Aggregate Analysis 🏃‍♂️💨")   
+            update_progress(80, "Working on Aggregate Analysis 🏂")   
             st.header("Aggregate Analysis 🔎")
             
             with st.spinner(' 🏂'):
