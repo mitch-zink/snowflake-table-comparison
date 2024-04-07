@@ -560,7 +560,7 @@ def display_column_analysis_charts(column_comparison_results):
 # # Main function to run the Snowflake Table Comparison Tool
 def main():
     st.set_page_config(layout="wide")
-    st.header("❄️ Snowflake Table Comparison Tool")
+    st.title("❄️ Snowflake Table Comparison Tool")
     # Initialize flags for aggregate, row level, column, and schema analysis
     agg_analysis_flag = "❌"
     row_level_analysis_flag = "❌"
