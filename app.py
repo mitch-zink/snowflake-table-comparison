@@ -578,9 +578,7 @@ def main():
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
-        user = st.sidebar.text_input("User 🧑‍💼", type="password").upper()
-        account = st.sidebar.text_input("Account 🏦", type="password").upper()
-        warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
+        user = st.sidebar.text_input("Username 🧑‍💼").upper()
         use_external_browser_auth = st.sidebar.checkbox(
             "Use External Browser Authentication"
         )
@@ -588,6 +586,10 @@ def main():
         authenticator = "externalbrowser" if use_external_browser_auth else "snowflake"
         if not use_external_browser_auth:
             password = st.sidebar.text_input("Password 🔒", type="password")
+        account = st.sidebar.text_input("Account 🏦").upper()
+        warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
+
+
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
             min_value=10,
