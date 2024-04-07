@@ -39,5 +39,5 @@ python3 -m venv venv && source venv/bin/activate && pip3 install --upgrade pip &
 streamlit run app.py
 ```
 
-## Example Run (Snowflake Sample Data DB)
-![Value Level Analysis 1](test_run.gif)
+## Example Run
+![Sample Run](test_run.gif)

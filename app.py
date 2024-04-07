@@ -286,6 +286,7 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     db_name_1, schema_name_1, _ = full_table_name_1.split(".")
     db_name_2, schema_name_2, _ = full_table_name_2.split(".")
 
+    # Adjusted to ensure unique comparison across both database and schema
     if db_name_1 == db_name_2 and schema_name_1 == schema_name_2:
         st.warning(
             "Skipping schema analysis because the database and schema are the same."
@@ -295,14 +296,15 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
     df_schema2, query2 = fetch_schema_info(ctx, db_name_2, schema_name_2)
 
-    df_schema1.rename(columns={"ROW_COUNT": f"{schema_name_1} Row Count"}, inplace=True)
-    df_schema2.rename(columns={"ROW_COUNT": f"{schema_name_2} Row Count"}, inplace=True)
+    df_schema1.rename(columns={"ROW_COUNT": f"{db_name_1}.{schema_name_1} Row Count"}, inplace=True)
+    df_schema2.rename(columns={"ROW_COUNT": f"{db_name_2}.{schema_name_2} Row Count"}, inplace=True)
 
+    # Ensure that the merge and comparison logic accounts for both database and schema names
     df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
     df_merged["Test"] = df_merged.apply(
         lambda row: (
             "Match"
-            if row[f"{schema_name_1} Row Count"] == row[f"{schema_name_2} Row Count"]
+            if row[f"{db_name_1}.{schema_name_1} Row Count"] == row[f"{db_name_2}.{schema_name_2} Row Count"]
             else "Mismatch"
         ),
         axis=1,
@@ -311,7 +313,7 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     test_counts = df_merged["Test"].value_counts().reset_index()
     test_counts.columns = ["Test Result", "Count"]
 
-    # Donut Chart for Test Resultscolumn_analysis_comparison_results
+    # Donut Chart for Test Results
     fig = px.pie(
         test_counts,
         names="Test Result",
@@ -320,13 +322,14 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         color_discrete_sequence=["#2980b9"],
     )
     fig.update_traces(textposition="inside", textinfo="percent+label")
-    st.plotly_chart(fig,  use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
     formatted_queries = [
         sqlparse.format(query, reindent=True, keyword_case="lower")
         for query in [query1, query2]
     ]
     return df_merged, formatted_queries
+
 
 
 # SCHEMA ANALYSIS FUNCTIONS - END
@@ -570,8 +573,8 @@ def main():
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
-        user = st.sidebar.text_input("User 🧑‍💼").upper()
-        account = st.sidebar.text_input("Account 🏦").upper()
+        user = st.sidebar.text_input("User 🧑‍💼", type="password").upper()
+        account = st.sidebar.text_input("Account 🏦", type="password").upper()
         warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
         use_external_browser_auth = st.sidebar.checkbox(
             "Use External Browser Authentication"
