@@ -19,11 +19,6 @@ generated_column_queries = []
 generated_row_queries = []
 generated_schema_queries = []
 
-# New global variables for flags
-show_meme_row_level_analysis = False
-show_meme_agg_analysis = False
-
-
 # Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
     """
