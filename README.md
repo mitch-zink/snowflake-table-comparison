@@ -41,7 +41,7 @@ This section compares table row counts between schemas.
     streamlit run app.py
     ```
 
-### For Windows (PowerShell)
+### For Windows
 
 1. **Allow Script Execution (if necessary)**
 
