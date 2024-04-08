@@ -359,8 +359,8 @@ def row_level_analysis_plot_comparison_results(
 
     # Prepare data for the plot with adjusted counts
     counts = {
-        "Table Row Discrepancies": differences_count,  # Renamed from "Differences Between Tables"
-        "Inconsistencies Within Matched Rows": matched_but_different_count,  # Renamed from "Detailed Differences for Matched Rows"
+        "Row Discrepancies": differences_count,  # Renamed from "Differences Between Tables"
+        "Column Discrepancies": matched_but_different_count,  # Renamed from "Detailed Differences for Matched Rows"
         "Rows Fetched from Table 1": rows_fetched_from_first,
         "Rows Fetched from Table 2": rows_fetched_from_second,
     }
@@ -705,7 +705,7 @@ def main():
                         st.dataframe(differences)
 
                 if not matched_but_different.empty and not matched_but_different.iloc[0, 0] == "All rows match":
-                    with st.expander("Inconsistencies Within Matched Rows ⚠️"):
+                    with st.expander("Column Discrepancies ⚠️"):
                         st.dataframe(matched_but_different)
 
                 display_generated_queries_for_section(
