@@ -246,12 +246,26 @@ def agg_analysis_execute_aggregate_query(
 
 # Function to plot the results of aggregate analysis, indicating pass/fail status for each check
 def plot_aggregate_analysis_summary(aggregate_results):
+    if aggregate_results.empty:
+        st.error("No results to display.")
+        return
+
+    # Count occurrences of "Match" and "Mismatch" in the "Result" column
     results_count = aggregate_results["Result"].value_counts().reset_index()
     results_count.columns = ["Result", "Count"]
 
-    # Convert Count column to string to use commas as thousand separators for better readability
-    results_count["Count"] = results_count["Count"].map(lambda x: "{:,}".format(x))
+    # Check if results_count dataframe has both "Match" and "Mismatch" rows
+    expected_results = ["Match", "Mismatch"]
+    for result in expected_results:
+        if result not in results_count["Result"].values:
+            # Add missing result with count 0
+            results_count = results_count.append({"Result": result, "Count": 0}, ignore_index=True)
 
+    # Ensure the order of results is consistent for the pie chart
+    results_count["Result"] = pd.Categorical(results_count["Result"], categories=expected_results)
+    results_count.sort_values("Result", inplace=True)
+
+    # Create the pie chart
     fig = px.pie(
         results_count,
         names="Result",
@@ -261,9 +275,10 @@ def plot_aggregate_analysis_summary(aggregate_results):
     )
 
     fig.update_traces(textinfo="percent+label", textposition="inside")
-    fig.update_layout(showlegend=True, title_x=0.5, title_text="")  # Remove the title
+    fig.update_layout(showlegend=True, title_text="")
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 # AGGREGATE ANALYSIS FUNCTIONS - END

@@ -32,7 +32,7 @@ This section compares table row counts between schemas.
 1. **Creating a Virtual Environment and Installing Dependencies**
 
     ```bash
-    python3 -m venv venv && source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+    python3 -m venv venv && source venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt 
     ```
 
 2. **Running the Streamlit App**
