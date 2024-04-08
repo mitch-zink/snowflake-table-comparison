@@ -19,6 +19,7 @@ generated_column_queries = []
 generated_row_queries = []
 generated_schema_queries = []
 
+
 # Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
     """
@@ -296,15 +297,20 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     df_schema1, query1 = fetch_schema_info(ctx, db_name_1, schema_name_1)
     df_schema2, query2 = fetch_schema_info(ctx, db_name_2, schema_name_2)
 
-    df_schema1.rename(columns={"ROW_COUNT": f"{db_name_1}.{schema_name_1} Row Count"}, inplace=True)
-    df_schema2.rename(columns={"ROW_COUNT": f"{db_name_2}.{schema_name_2} Row Count"}, inplace=True)
+    df_schema1.rename(
+        columns={"ROW_COUNT": f"{db_name_1}.{schema_name_1} Row Count"}, inplace=True
+    )
+    df_schema2.rename(
+        columns={"ROW_COUNT": f"{db_name_2}.{schema_name_2} Row Count"}, inplace=True
+    )
 
     # Ensure that the merge and comparison logic accounts for both database and schema names
     df_merged = pd.merge(df_schema1, df_schema2, on="TABLE_NAME", how="outer")
     df_merged["Test"] = df_merged.apply(
         lambda row: (
             "Match"
-            if row[f"{db_name_1}.{schema_name_1} Row Count"] == row[f"{db_name_2}.{schema_name_2} Row Count"]
+            if row[f"{db_name_1}.{schema_name_1} Row Count"]
+            == row[f"{db_name_2}.{schema_name_2} Row Count"]
             else "Mismatch"
         ),
         axis=1,
@@ -329,7 +335,6 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
         for query in [query1, query2]
     ]
     return df_merged, formatted_queries
-
 
 
 # SCHEMA ANALYSIS FUNCTIONS - END
@@ -445,6 +450,66 @@ def row_level_analysis_compare_dataframes_by_key(df1, df2, key_column):
     return differences, matched_but_different
 
 
+def row_level_analysis_fetch_data(
+    ctx, full_table_name, key_column, filter_conditions="", row_count=50
+):
+    """
+    Fetches data from Snowflake for row level analysis, capturing and storing the executed SQL queries.
+    """
+    base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
+    # Define queries for fetching data from the top and bottom of the table based on the key column
+    queries = [
+        f"SELECT * FROM {full_table_name} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
+        f"SELECT * FROM {full_table_name} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}",
+    ]
+
+    dfs = []
+    for query in queries:
+        formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
+        # Store the formatted queries for display or further use
+        generated_row_queries.append(formatted_query)
+        try:
+            df = pd.read_sql(query, ctx)
+            dfs.append(df)
+        except Exception as exc:
+            st.error(f"Query execution failed: {exc}")
+            return pd.DataFrame()
+
+    # Concatenate dataframes to combine the top and bottom fetched rows
+    df_combined = pd.concat(dfs).drop_duplicates().reset_index(drop=True)
+    return df_combined
+
+
+def row_level_analysis(
+    ctx,
+    full_table_name1,
+    full_table_name2,
+    key_column,
+    filter_conditions="",
+    row_count=50,
+):
+    """
+    Performs row level analysis between two tables, including fetching data, comparing dataframes,
+    and plotting comparison results.
+    """
+    df1 = row_level_analysis_fetch_data(
+        ctx, full_table_name1, key_column, filter_conditions, row_count
+    )
+    df2 = row_level_analysis_fetch_data(
+        ctx, full_table_name2, key_column, filter_conditions, row_count
+    )
+
+    differences, matched_but_different = row_level_analysis_compare_dataframes_by_key(
+        df1, df2, key_column
+    )
+
+    row_level_analysis_plot_comparison_results(
+        differences, matched_but_different, len(df1), len(df2)
+    )
+
+    return differences, matched_but_different
+
+
 # ROW LEVEL ANALYSIS FUNCTIONS - END
 
 
@@ -517,6 +582,7 @@ def column_analysis_comparison_results(column_comparison_results):
     )
     return fig  # Return the figure instead of directly displaying it
 
+
 # Function to plot a summary of the schema comparison focusing on data type matches/mismatches
 def plot_column_comparison_summary(column_comparison_results):
     data_type_counts = (
@@ -542,6 +608,7 @@ def plot_column_comparison_summary(column_comparison_results):
         legend_title="Match Status",
     )
     return fig_data_types  # Return the figure instead of directly displaying it
+
 
 # Function to display column analysis charts side by side
 def display_column_analysis_charts(column_comparison_results):
@@ -574,7 +641,7 @@ def main():
     row_level_analysis_flag = "❌"
     column_analysis_flag = "⏳"  # Placeholder for column analysis
     schema_analysis_flag = "⏳"  # Placeholder for schema analysis
-                 
+
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
@@ -588,7 +655,6 @@ def main():
             password = st.sidebar.text_input("Password 🔒", type="password")
         account = st.sidebar.text_input("Account 🏦").upper()
         warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
-
 
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
@@ -657,65 +723,39 @@ def main():
                 warehouse=warehouse,
             )
 
-            base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
-
-            queries = [
-                f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
-                f"SELECT * FROM {full_table_name1} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}",
-                f"SELECT * FROM {full_table_name2} {base_filter} ORDER BY {key_column} ASC LIMIT {row_count}",
-                f"SELECT * FROM {full_table_name2} {base_filter} ORDER BY {key_column} DESC LIMIT {row_count}",
-            ]
-
-            for query in queries:
-                formatted_query = sqlparse.format(
-                    query, reindent=True, keyword_case="lower"
-                )
-                generated_row_queries.append(formatted_query)
-
-            dfs = {}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                future_to_query = {
-                    executor.submit(fetch_data, ctx, query): query for query in queries
-                }
-                for future in concurrent.futures.as_completed(future_to_query):
-                    query = future_to_query[future]
-                    try:
-                        dfs[query] = future.result()
-                    except Exception as exc:
-                        st.error(f"Query {query} generated an exception: {exc}")
-                        return
-
-            df1 = pd.concat([dfs[queries[0]], dfs[queries[1]]])
-            df2 = pd.concat([dfs[queries[2]], dfs[queries[3]]])
-
             update_progress(15, "Working on Row Level Analysis 🏂")
 
             st.header("Row Level Analysis 🔎")
-            with st.spinner(' 🏂'):
-                differences, matched_but_different = (
-                    row_level_analysis_compare_dataframes_by_key(df1, df2, key_column)
+            with st.spinner("🏂"):
+                differences, matched_but_different = row_level_analysis(
+                    ctx,
+                    full_table_name1,
+                    full_table_name2,
+                    key_column,
+                    filter_conditions,
+                    row_count,
                 )
 
-                row_level_analysis_plot_comparison_results(
-                    differences, matched_but_different, len(df1), len(df2)
-                )
-
-                if not differences.empty and not differences.iloc[0, 0] == "All rows match":
+                if (
+                    not differences.empty
+                    and not differences.iloc[0, 0] == "All rows match"
+                ):
                     with st.expander("Row Discrepancies ⚠️"):
                         st.dataframe(differences)
 
-                if not matched_but_different.empty and not matched_but_different.iloc[0, 0] == "All rows match":
+                if (
+                    not matched_but_different.empty
+                    and not matched_but_different.iloc[0, 0] == "All rows match"
+                ):
                     with st.expander("Column Discrepancies ⚠️"):
                         st.dataframe(matched_but_different)
 
-                display_generated_queries_for_section(
-                    generated_row_queries, ""
-                )
-                
+                display_generated_queries_for_section(generated_row_queries, "")
                 # Calculate the counts for differences and matched_but_different
                 differences_count = (
                     0
-                    if not differences.empty and differences.iloc[0, 0] == "All rows match"
+                    if not differences.empty
+                    and differences.iloc[0, 0] == "All rows match"
                     else len(differences)
                 )
                 matched_but_different_count = (
@@ -724,7 +764,7 @@ def main():
                     and matched_but_different.iloc[0, 0] == "All rows match"
                     else len(matched_but_different)
                 )
-                
+
                 # Set the flag for row level analysis
                 if differences_count == 0 and matched_but_different_count == 0:
                     row_level_analysis_flag = "✅"
@@ -732,14 +772,15 @@ def main():
                 # Update progress with the flags and line breaks
                 progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
 
-
             update_progress(40, "Working on Column Analysis 🏂")
             st.header("Column Analysis 🔎")
-            with st.spinner(' 🏂'):
+            with st.spinner(" 🏂"):
                 column_comparison_results = column_analysis(
                     ctx, full_table_name1, full_table_name2
                 )
-                column_comparison_results = column_analysis(ctx, full_table_name1, full_table_name2)
+                column_comparison_results = column_analysis(
+                    ctx, full_table_name1, full_table_name2
+                )
                 display_column_analysis_charts(column_comparison_results)
 
             with st.expander("Results 📊"):
@@ -747,13 +788,11 @@ def main():
 
             display_generated_queries_for_section(generated_column_queries, "")
 
-
             update_progress(60, "Working on Schema Analysis 🏂")
-            
 
             st.header("Schema Analysis 🔎")
 
-            with st.spinner(' 🏂'):
+            with st.spinner(" 🏂"):
 
                 df_merged, formatted_queries = schema_analysis(
                     ctx, full_table_name1, full_table_name2, st
@@ -763,31 +802,29 @@ def main():
                         st.write(df_merged)
                 display_generated_queries_for_section(formatted_queries, "")
 
-            update_progress(80, "Working on Aggregate Analysis 🏂")   
+            update_progress(80, "Working on Aggregate Analysis 🏂")
             st.header("Aggregate Analysis 🔎")
-            
-            with st.spinner(' 🏂'):
+
+            with st.spinner(" 🏂"):
                 aggregate_results = perform_aggregate_analysis(
                     ctx, full_table_name1, full_table_name2, filter_conditions
                 )
                 plot_aggregate_analysis_summary(aggregate_results)
                 with st.expander("Results 📊"):
                     st.dataframe(aggregate_results)
-                display_generated_queries_for_section(
-                    generated_aggregate_queries, ""
-                )
+                display_generated_queries_for_section(generated_aggregate_queries, "")
 
                 # Set the flag for aggregate analysis
                 if all(aggregate_results["Result"] == "Match"):
                     agg_analysis_flag = "✅"
-                    
+
                 # Update progress with the flags and line breaks
                 progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
-            
+
             update_progress(100, "Analysis completed ✅")
 
             update_progress(100, progress_message)
-            
+
         except Exception as e:
             update_progress(0, f"Failed to run analysis: {e}")
 
