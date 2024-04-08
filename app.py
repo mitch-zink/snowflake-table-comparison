@@ -667,10 +667,10 @@ def main():
             "Unique Key Column 🗝️", placeholder="UNIQUE_KEY"
         ).upper()
         full_table_name1 = st.sidebar.text_input(
-            "Table 1 📝", placeholder="DATABASE.SCHEMA.TABLE"
+            "Table 1 ❄️", placeholder="DATABASE.SCHEMA.TABLE"
         ).upper()
         full_table_name2 = st.sidebar.text_input(
-            "Table 2 ✏️", placeholder="DATABASE.SCHEMA.TABLE"
+            "Table 2 ❄️", placeholder="DATABASE.SCHEMA.TABLE"
         ).upper()
         filter_conditions = st.sidebar.text_area(
             "Filter conditions (optional) ✨",
