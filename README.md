@@ -23,7 +23,6 @@ This section compares table row counts between schemas.
 
 ## Roadmap
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally 
-- Documentation | Rename the app name that appears at the top of the page from app to Table Comparison - Snowflake
 
 ## Setup Instructions
 
