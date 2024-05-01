@@ -77,6 +77,15 @@ def perform_aggregate_analysis(
 
     df_schema1 = agg_analysis_fetch_schema(ctx, catalog1, schema1, table1)
     df_schema2 = agg_analysis_fetch_schema(ctx, catalog2, schema2, table2)
+
+    # Adjust the schema data frames to treat all timestamp types as equivalent
+    df_schema1["DATA_TYPE"] = df_schema1["DATA_TYPE"].replace(
+        ["TIMESTAMP_LTZ", "TIMESTAMP_NTZ", "TIMESTAMP_TZ"], "TIMESTAMP"
+    )
+    df_schema2["DATA_TYPE"] = df_schema2["DATA_TYPE"].replace(
+        ["TIMESTAMP_LTZ", "TIMESTAMP_NTZ", "TIMESTAMP_TZ"], "TIMESTAMP"
+    )
+
     matching_columns = pd.merge(
         df_schema1, df_schema2, on=["COLUMN_NAME", "DATA_TYPE"], how="inner"
     )
@@ -135,6 +144,32 @@ def perform_aggregate_analysis(
     if results1 is None or results2 is None:
         st.error("Failed to fetch results from one or both tables.")
         return pd.DataFrame()
+
+    comparison_results_list = []
+    for column in results1.columns:
+        val1, val2 = results1[column].iloc[0], results2[column].iloc[0]
+        str_val1, str_val2 = str(val1), str(val2)
+        result = "Match" if str_val1 == str_val2 else "Mismatch"
+        comparison_results_list.append(
+            {
+                "Column Name": column,
+                "Result": result,
+                "Table 1 Value": str_val1,
+                "Table 2 Value": str_val2,
+                "Description": agg_analysis_get_check_description(column),
+            }
+        )
+
+    return pd.DataFrame(
+        comparison_results_list,
+        columns=[
+            "Column Name",
+            "Result",
+            "Table 1 Value",
+            "Table 2 Value",
+            "Description",
+        ],
+    )
 
     # Compare the results of aggregate analysis between both tables
     comparison_results_list = []
@@ -218,13 +253,17 @@ def agg_analysis_aggregate_expression(column_name, data_type):
         return f"COUNT({column_name}) AS count_{column_name.lower()}, APPROX_COUNT_DISTINCT({column_name}) AS unique_{column_name.lower()}"
     # Handling date and timestamp types with MIN, MAX, and COUNT
     elif data_type.upper() in timestamp_types:
-        # Ensure timestamps are converted to a standard format for proper comparison
-        return f"TO_CHAR(MIN({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS min_{column_name.lower()}, TO_CHAR(MAX({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS max_{column_name.lower()}, COUNT({column_name}) AS count_{column_name.lower()}"
+        # Convert timestamps to a consistent string format for proper comparison
+        # This will ignore timezone information by formatting to a string without timezone.
+        return (
+            f"TO_CHAR(MIN({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS min_{column_name.lower()}, "
+            f"TO_CHAR(MAX({column_name}), 'YYYY-MM-DD HH24:MI:SS') AS max_{column_name.lower()}, "
+            f"COUNT({column_name}) AS count_{column_name.lower()}"
+        )
     else:
         # For data types that do not match any of the above categories, return None
         # This will exclude them from aggregate queries
         return None
-
 
 # Function to execute an aggregate query on a table in Snowflake
 def agg_analysis_execute_aggregate_query(
@@ -259,10 +298,14 @@ def plot_aggregate_analysis_summary(aggregate_results):
     for result in expected_results:
         if result not in results_count["Result"].values:
             # Add missing result with count 0
-            results_count = results_count.append({"Result": result, "Count": 0}, ignore_index=True)
+            results_count = results_count.append(
+                {"Result": result, "Count": 0}, ignore_index=True
+            )
 
     # Ensure the order of results is consistent for the pie chart
-    results_count["Result"] = pd.Categorical(results_count["Result"], categories=expected_results)
+    results_count["Result"] = pd.Categorical(
+        results_count["Result"], categories=expected_results
+    )
     results_count.sort_values("Result", inplace=True)
 
     # Create the pie chart
@@ -278,7 +321,6 @@ def plot_aggregate_analysis_summary(aggregate_results):
     fig.update_layout(showlegend=True, title_text="")
 
     st.plotly_chart(fig, use_container_width=True)
-
 
 
 # AGGREGATE ANALYSIS FUNCTIONS - END
