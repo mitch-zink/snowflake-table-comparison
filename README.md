@@ -28,16 +28,10 @@ This section compares table row counts between schemas.
 
 ### For Mac/Linux
 
-1. **Creating a Virtual Environment and Installing Dependencies**
+1. **Creating a Virtual Environment and Installing Dependencies, and run the app**
 
     ```bash
-    python3 -m venv venv && source venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt 
-    ```
-
-2. **Running the Streamlit App**
-
-    ```bash
-    streamlit run app.py
+    python3 -m venv venv && source venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
     ```
 
 ### For Windows
