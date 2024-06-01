@@ -265,6 +265,7 @@ def agg_analysis_aggregate_expression(column_name, data_type):
         # This will exclude them from aggregate queries
         return None
 
+
 # Function to execute an aggregate query on a table in Snowflake
 def agg_analysis_execute_aggregate_query(
     ctx, catalog, schema, table, aggregates, filter_conditions=""
@@ -850,7 +851,6 @@ def main():
             st.header("Schema Analysis 🔎")
 
             with st.spinner(" 🏂"):
-
                 df_merged, formatted_queries = schema_analysis(
                     ctx, full_table_name1, full_table_name2, st
                 )
