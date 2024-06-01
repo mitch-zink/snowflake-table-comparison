@@ -1,4 +1,4 @@
-name: Python Application Test
+name: python-run-app
 
 on:
   push:
