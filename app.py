@@ -299,7 +299,10 @@ def plot_aggregate_analysis_summary(aggregate_results):
     for result in expected_results:
         if result not in results_count["Result"].values:
             # Use pd.concat instead of append
-            results_count = pd.concat([results_count, pd.DataFrame({"Result": [result], "Count": [0]})], ignore_index=True)
+            results_count = pd.concat(
+                [results_count, pd.DataFrame({"Result": [result], "Count": [0]})],
+                ignore_index=True,
+            )
 
     # Ensure the order of results is consistent for the pie chart
     results_count["Result"] = pd.Categorical(
@@ -320,6 +323,7 @@ def plot_aggregate_analysis_summary(aggregate_results):
     fig.update_layout(showlegend=True, title_text="")
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 # AGGREGATE ANALYSIS FUNCTIONS - END
 
