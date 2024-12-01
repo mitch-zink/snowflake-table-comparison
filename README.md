@@ -8,7 +8,7 @@
 
 ## Setup Instructions
 
-### **Creating a Virtual Environment and Installing Dependencies, and run the app**
+### Create a Virtual Environment, Install Dependencies, and run the app
 
 #### For Mac/Linux
 
