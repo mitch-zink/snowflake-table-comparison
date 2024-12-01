@@ -6,6 +6,22 @@
 [![Snowflake](https://img.shields.io/badge/-Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)](https://snowflake.com/)
 [![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 
+## Setup Instructions
+
+### **Creating a Virtual Environment and Installing Dependencies, and run the app**
+
+#### For Mac/Linux
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
+```
+
+#### For Windows
+
+```powershell
+py -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pip; pip install -r requirements.txt; streamlit run app.py
+```
+
 ## Overview
 
 This tool analyzes differences between two Snowflake tables across five main sections:
@@ -39,19 +55,3 @@ Compares unique key counts grouped by month-year between the two tables, ensurin
 ## Roadmap
 
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally
-
-## Setup Instructions
-
-### **Creating a Virtual Environment and Installing Dependencies, and run the app**
-
-#### For Mac/Linux
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
-```
-
-#### For Windows
-
-```powershell
-py -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pip; pip install -r requirements.txt; streamlit run app.py
-```
