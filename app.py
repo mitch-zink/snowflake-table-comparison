@@ -1,7 +1,6 @@
 """
 Snowflake Table Comparison App
-Description: This application provides comprehensive comparisons and analyses between two Snowflake tables,
-including schema, row-level, aggregate, column, and date column analysis.
+Description: This application provides comprehensive comparisons and analyses between two Snowflake tables, including schema, row-level, aggregate, column, and date column analysis.
 Author: Mitch Zink
 Last Updated: 12/1/2024
 """
