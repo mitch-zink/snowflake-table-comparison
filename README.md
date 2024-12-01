@@ -7,7 +7,7 @@
 
 ## Overview
 
-This tool analyzes differences between two Snowflake tables across four main sections:
+This tool analyzes differences between two Snowflake tables across five main sections:
 
 ### 1. Row Level Analysis
 Compares data row-by-row to highlight discrepancies and matches between tables.
