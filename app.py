@@ -4,26 +4,26 @@ Author: Mitch Zink
 Last Updated: 4/6/2024
 """
 
-import pandas as pd  # Data manipulation
-import snowflake.connector
-import streamlit as st  # UI
-import plotly.express as px  # Interactive visualizations
-import concurrent.futures  # Parallel execution of queries
-import sqlparse  # Formatting SQL queries
+import concurrent.futures
 import time
 
+import pandas as pd
+import plotly.express as px
+import snowflake.connector
+import sqlparse
+import streamlit as st
 
 # Global variables to store generated queries
 generated_aggregate_queries = []
 generated_column_queries = []
 generated_row_queries = []
 generated_schema_queries = []
+generated_date_queries = []
 
 
-# Function to display generated queries for a specific analysis section
 def display_generated_queries_for_section(queries, section_name):
     """
-    Function to display generated queries for a specific analysis section.
+    Function to display generated queries for a specific analysis section
     """
     if queries:  # Check if there are any queries to display
         with st.expander(f"{section_name} Queries 👨‍💻"):
@@ -31,14 +31,18 @@ def display_generated_queries_for_section(queries, section_name):
                 st.code(query, language="sql")
 
 
-# Function to query data from Snowflake
 def fetch_data(ctx, query):
+    """
+    Query data from Snowflake
+    """
     return pd.read_sql(query, ctx)
 
 
-# AGGREGATE ANALYSIS FUNCTIONS - START
-# Function to fetch schema details from Snowflake
+# 📊 Aggregate Analysis Functions - Start
 def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_conditions=""):
+    """
+    Fetch schema details from Snowflake
+    """
     # First attempt with normal filter
     where_clause = f" AND {filter_conditions}" if filter_conditions else ""
     schema_query = f"""
@@ -68,10 +72,12 @@ def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_condition
     return df
 
 
-# Function to perform aggregate analysis between two tables in Snowflake
 def perform_aggregate_analysis(
     ctx, full_table_name1, full_table_name2, filter_conditions=""
 ):
+    """
+    Perform aggregate analysis between two tables in Snowflake
+    """
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
 
@@ -196,8 +202,10 @@ def perform_aggregate_analysis(
     ]
 
 
-# Function to generate descriptions based on aggregate column names (case-insensitive)
 def agg_analysis_get_check_description(column):
+    """
+    Generate descriptions based on aggregate column names (case-insensitive)
+    """
     column = (
         column.lower()
     )  # Convert column name to lower case for case-insensitive comparison
@@ -221,8 +229,10 @@ def agg_analysis_get_check_description(column):
         return "Specific description not available for this check."
 
 
-# Function to define aggregate expressions based on the data type of a column.
 def agg_analysis_aggregate_expression(column_name, data_type):
+    """
+    Define aggregate expressions based on the data type of a column
+    """
     numeric_types = [
         "NUMBER",
         "FLOAT",
@@ -266,10 +276,12 @@ def agg_analysis_aggregate_expression(column_name, data_type):
         return None
 
 
-# Function to execute an aggregate query on a table in Snowflake
 def agg_analysis_execute_aggregate_query(
     ctx, catalog, schema, table, aggregates, filter_conditions=""
 ):
+    """
+    Execute an aggregate query on a table in Snowflake
+    """
     where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
     aggregates_sql = ", ".join(aggregates)
     query = f"""WITH table_agg AS (
@@ -284,8 +296,10 @@ def agg_analysis_execute_aggregate_query(
     return pd.read_sql(query, ctx)
 
 
-# Function to plot the results of aggregate analysis, indicating pass/fail status for each check
 def plot_aggregate_analysis_summary(aggregate_results):
+    """
+    Plot the results of aggregate analysis, indicating pass/fail status for each check
+    """
     if aggregate_results.empty:
         st.error("No results to display.")
         return
@@ -299,7 +313,10 @@ def plot_aggregate_analysis_summary(aggregate_results):
     for result in expected_results:
         if result not in results_count["Result"].values:
             # Use pd.concat instead of append
-            results_count = pd.concat([results_count, pd.DataFrame({"Result": [result], "Count": [0]})], ignore_index=True)
+            results_count = pd.concat(
+                [results_count, pd.DataFrame({"Result": [result], "Count": [0]})],
+                ignore_index=True,
+            )
 
     # Ensure the order of results is consistent for the pie chart
     results_count["Result"] = pd.Categorical(
@@ -321,14 +338,16 @@ def plot_aggregate_analysis_summary(aggregate_results):
 
     st.plotly_chart(fig, use_container_width=True)
 
-# AGGREGATE ANALYSIS FUNCTIONS - END
+
+# 📊 Aggregate Analysis Functions - End
 
 
-# SCHEMA ANALYSIS FUNCTIONS - START
-
-
-# Function to compare schemas of two tables in Snowflake and fetch schema details
+# 📊 Schema Analysis Functions - Start
 def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
+    """
+    Compare schemas of two tables in Snowflake and fetch schema details
+    """
+
     def fetch_schema_info(ctx, database, schema):
         query = f"""
         SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT
@@ -392,17 +411,19 @@ def schema_analysis(ctx, full_table_name_1, full_table_name_2, st):
     return df_merged, formatted_queries
 
 
-# SCHEMA ANALYSIS FUNCTIONS - END
+# 📊 Schema Analysis Functions - End
 
 
-# ROW LEVEL ANALYSIS FUNCTIONS - START
-# Function to plot the comparison results using a bar chart
+# 📊 Row Level Analysis Functions - Start
 def row_level_analysis_plot_comparison_results(
     differences,
     matched_but_different,
     rows_fetched_from_first,
     rows_fetched_from_second,
 ):
+    """
+    Plot the comparison results using a bar chart
+    """
     # Check for dummy rows (indicating a complete match) and adjust counts
     if not differences.empty and differences.iloc[0, 0] == "All rows match":
         differences_count = 0
@@ -446,8 +467,10 @@ def row_level_analysis_plot_comparison_results(
     )  # Ensure the chart uses the container width to fit properly
 
 
-# Function to compare two dataframes by a specific key column
 def row_level_analysis_compare_dataframes_by_key(df1, df2, key_column):
+    """
+    Compare two dataframes by a specific key column
+    """
     # Handling the scenario where both dataframes are identical
     if df1.equals(df2):
         # Creating a dummy row to indicate that the dataframes match completely
@@ -509,7 +532,7 @@ def row_level_analysis_fetch_data(
     ctx, full_table_name, key_column, filter_conditions="", row_count=50
 ):
     """
-    Fetches data from Snowflake for row level analysis, capturing and storing the executed SQL queries.
+    Fetches data from Snowflake for row level analysis, capturing and storing the executed SQL queries
     """
     base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
     # Define queries for fetching data from the top and bottom of the table based on the key column
@@ -545,7 +568,7 @@ def row_level_analysis(
 ):
     """
     Performs row level analysis between two tables, including fetching data, comparing dataframes,
-    and plotting comparison results.
+    and plotting comparison results
     """
     df1 = row_level_analysis_fetch_data(
         ctx, full_table_name1, key_column, filter_conditions, row_count
@@ -565,12 +588,14 @@ def row_level_analysis(
     return differences, matched_but_different
 
 
-# ROW LEVEL ANALYSIS FUNCTIONS - END
+# 📊 Row Level Analysis Functions - End
 
 
-# COLUMN ANALYSIS FUNCTIONS - START
-# Function to compare schemas of two tables in Snowflake and fetch schema details
+# 📊 Column Analysis Functions - Start
 def column_analysis(ctx, full_table_name1, full_table_name2):
+    """
+    Compare schemas of two tables in Snowflake and fetch schema details
+    """
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
 
@@ -616,8 +641,10 @@ def column_analysis(ctx, full_table_name1, full_table_name2):
     return comparison_results
 
 
-# Function to plot schema comparison results using a bar chart
 def column_analysis_comparison_results(column_comparison_results):
+    """
+    Plot schema comparison results using a bar chart
+    """
     counts = column_comparison_results["Column Presence"].value_counts().reset_index()
     counts.columns = ["Category", "Count"]
     fig = px.bar(
@@ -638,8 +665,10 @@ def column_analysis_comparison_results(column_comparison_results):
     return fig  # Return the figure instead of directly displaying it
 
 
-# Function to plot a summary of the schema comparison focusing on data type matches/mismatches
 def plot_column_comparison_summary(column_comparison_results):
+    """
+    Plot a summary of the schema comparison focusing on data type matches/mismatches
+    """
     data_type_counts = (
         column_comparison_results["Data Type Match"]
         .value_counts()
@@ -665,8 +694,11 @@ def plot_column_comparison_summary(column_comparison_results):
     return fig_data_types  # Return the figure instead of directly displaying it
 
 
-# Function to display column analysis charts side by side
+# Function to
 def display_column_analysis_charts(column_comparison_results):
+    """
+    Display column analysis charts side by side
+    """
     # Generate both figures for the column analysis
     fig1 = column_analysis_comparison_results(column_comparison_results)
     fig2 = plot_column_comparison_summary(column_comparison_results)
@@ -679,10 +711,256 @@ def display_column_analysis_charts(column_comparison_results):
         st.plotly_chart(fig2, use_container_width=True)
 
 
-# COLUMN ANALYSIS FUNCTIONS - END
+# 📊 Column Analysis Functions - End
 
 
-# # Main function to run the Snowflake Table Comparison Tool
+# 📊 Date Column Analysis Function - Start
+def date_column_analysis(
+    ctx, full_table_name, date_column, key_column, filter_conditions=""
+):
+    where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
+    query = f"""
+    SELECT 
+        TO_CHAR({date_column}, 'YYYY-MM') AS "month_year",
+        COUNT(DISTINCT {key_column}) AS "unique_key_count"
+    FROM {full_table_name}
+    {where_clause}
+    GROUP BY TO_CHAR({date_column}, 'YYYY-MM')
+    HAVING COUNT(DISTINCT {key_column}) > 0
+    ORDER BY TO_CHAR({date_column}, 'YYYY-MM')
+    """
+    formatted_query = sqlparse.format(query, reindent=True, keyword_case="lower")
+    if formatted_query not in generated_date_queries:
+        generated_date_queries.append(formatted_query)
+    df = pd.read_sql(query, ctx)
+
+    # Filter out invalid data before conversion
+    df = df[df["month_year"].str.match(r"^\d{4}-\d{2}$", na=False)]
+
+    return df
+
+
+def data_column_analysis(
+    ctx,
+    full_table_name1,
+    full_table_name2,
+    date_column,
+    key_column,
+    filter_conditions="",
+):
+    st.header("Date Column Analysis 📅")
+    with st.spinner(" 🏂"):
+        # Perform date column analysis on both tables
+        df_date_analysis1 = date_column_analysis(
+            ctx,
+            full_table_name1,
+            date_column,
+            key_column,
+            filter_conditions,
+        )
+        df_date_analysis1["Table"] = "Table 1"
+
+        df_date_analysis2 = date_column_analysis(
+            ctx,
+            full_table_name2,
+            date_column,
+            key_column,
+            filter_conditions,
+        )
+        df_date_analysis2["Table"] = "Table 2"
+
+        # Combine the dataframes
+        df_combined = pd.concat([df_date_analysis1, df_date_analysis2])
+
+        # Ensure 'month_year' is in datetime format for proper sorting
+        df_combined["month_year"] = pd.to_datetime(
+            df_combined["month_year"], format="%Y-%m"
+        )
+
+        # Generate a full range of months
+        start_date = df_combined["month_year"].min()
+        end_date = df_combined["month_year"].max()
+        full_date_range = pd.date_range(
+            start=start_date, end=end_date, freq="MS"
+        )  # Start of each month
+
+        # Create a DataFrame with the full date range
+        full_date_df = pd.DataFrame({"month_year": full_date_range})
+
+        # Merge with the combined DataFrame to ensure all months are represented
+        df_combined = full_date_df.merge(
+            df_combined, on="month_year", how="left"
+        ).fillna(
+            {"unique_key_count": 0}
+        )  # Fill missing counts with 0
+
+        # Sort the dataframe by 'month_year'
+        df_combined.sort_values(by="month_year", inplace=True)
+
+        # Calculate the maximum value for dynamic Y-axis range
+        max_value = df_combined["unique_key_count"].max()
+        y_axis_range = [0, max_value * 1.1] if max_value > 0 else [0, 1]
+
+        # Plotting the data using a grouped bar chart
+        fig = px.bar(
+            df_combined,
+            x="month_year",
+            y="unique_key_count",
+            color="Table",
+            barmode="group",
+            labels={
+                "month_year": "Month-Year",
+                "unique_key_count": "Unique Key Count",
+            },
+            title="Unique Key Count by Month-Year for Both Tables",
+        )
+
+        fig.update_layout(
+            xaxis_tickformat="%Y-%m",
+            xaxis_title="Month-Year",
+            yaxis_title="Unique Key Count",
+        )
+
+        # Dynamically set Y-axis range
+        fig.update_yaxes(range=y_axis_range)
+
+        st.plotly_chart(fig, use_container_width=True)
+        display_generated_queries_for_section(generated_date_queries, "")
+
+        # Results Section
+        with st.expander("Results 📊"):
+            # Convert 'month_year' in the individual DataFrames to datetime
+            df_date_analysis1["month_year"] = pd.to_datetime(
+                df_date_analysis1["month_year"], format="%Y-%m"
+            )
+            df_date_analysis2["month_year"] = pd.to_datetime(
+                df_date_analysis2["month_year"], format="%Y-%m"
+            )
+
+            # Merge the two dataframes on 'month_year'
+            df_results = pd.merge(
+                df_date_analysis1[["month_year", "unique_key_count"]],
+                df_date_analysis2[["month_year", "unique_key_count"]],
+                on="month_year",
+                how="outer",
+                suffixes=("_table1", "_table2"),
+            )
+
+            # Fill NaN values with 0 and convert to integer
+            df_results["unique_key_count_table1"] = (
+                df_results["unique_key_count_table1"].fillna(0).astype(int)
+            )
+            df_results["unique_key_count_table2"] = (
+                df_results["unique_key_count_table2"].fillna(0).astype(int)
+            )
+
+            # Compare the counts and flag 'Match' or 'Mismatch'
+            df_results["Result"] = df_results.apply(
+                lambda row: (
+                    "Match"
+                    if row["unique_key_count_table1"] == row["unique_key_count_table2"]
+                    else "Mismatch"
+                ),
+                axis=1,
+            )
+
+            # Convert 'month_year' back to string format for display
+            df_results["month_year"] = df_results["month_year"].dt.strftime("%Y-%m")
+
+            # Reorder columns for better readability
+            df_results = df_results[
+                [
+                    "month_year",
+                    "unique_key_count_table1",
+                    "unique_key_count_table2",
+                    "Result",
+                ]
+            ]
+
+            st.dataframe(df_results)
+
+
+def data_column_variance_analysis(
+    ctx,
+    full_table_name1,
+    full_table_name2,
+    date_column,
+    key_column,
+    filter_conditions="",
+):
+    # Perform date column analysis on both tables
+    df_date_analysis1 = date_column_analysis(
+        ctx,
+        full_table_name1,
+        date_column,
+        key_column,
+        filter_conditions,
+    )
+    df_date_analysis1.rename(
+        columns={"unique_key_count": "unique_key_count_table1"}, inplace=True
+    )
+
+    df_date_analysis2 = date_column_analysis(
+        ctx,
+        full_table_name2,
+        date_column,
+        key_column,
+        filter_conditions,
+    )
+    df_date_analysis2.rename(
+        columns={"unique_key_count": "unique_key_count_table2"}, inplace=True
+    )
+
+    # Merge the two datasets on month-year
+    df_merged = pd.merge(
+        df_date_analysis1,
+        df_date_analysis2,
+        on="month_year",
+        how="outer",
+    ).fillna(0)
+
+    # Calculate variance between the two tables
+    df_merged["variance"] = (
+        df_merged["unique_key_count_table1"] - df_merged["unique_key_count_table2"]
+    )
+
+    # Ensure month_year is a datetime for sorting
+    df_merged["month_year"] = pd.to_datetime(df_merged["month_year"], format="%Y-%m")
+    df_merged.sort_values("month_year", inplace=True)
+
+    # Create a bar chart for variances
+    fig = px.bar(
+        df_merged,
+        x="month_year",
+        y="variance",
+        labels={"month_year": "Month-Year", "variance": "Variance"},
+        title="Variance in Unique Key Count by Month-Year",
+        color="variance",
+        color_continuous_scale=[
+            "#d62728",
+            "#1f77b4",
+        ],  # Red for negative, blue for positive
+    )
+
+    # Add styling to improve readability
+    fig.update_layout(
+        xaxis_tickformat="%Y-%m",
+        xaxis_title="Month-Year",
+        yaxis_title="Variance",
+        coloraxis_showscale=False,  # Hide the color scale
+    )
+
+    # Display the chart
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Display the data table for reference
+    with st.expander("Results 📊"):
+        st.dataframe(df_merged)
+
+
+# 📊 Date Column Analysis Function - End
+
+
 def main():
     st.set_page_config(
         page_title="Snowflake Table Comparison Tool",
@@ -720,6 +998,10 @@ def main():
         )
         key_column = st.sidebar.text_input(
             "Unique Key Column 🗝️", placeholder="UNIQUE_KEY"
+        ).upper()
+        # Added date column input
+        date_column = st.sidebar.text_input(
+            "Date Column 📅", placeholder="DATE_COLUMN"
         ).upper()
         full_table_name1 = st.sidebar.text_input(
             "Table 1 ❄️", placeholder="DATABASE.SCHEMA.TABLE"
@@ -833,9 +1115,6 @@ def main():
                 column_comparison_results = column_analysis(
                     ctx, full_table_name1, full_table_name2
                 )
-                column_comparison_results = column_analysis(
-                    ctx, full_table_name1, full_table_name2
-                )
                 display_column_analysis_charts(column_comparison_results)
 
             with st.expander("Results 📊"):
@@ -874,6 +1153,26 @@ def main():
 
                 # Update progress with the flags and line breaks
                 progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
+
+            update_progress(90, "Working on Date Column Analysis 🏂")
+
+            if date_column:
+                data_column_analysis(
+                    ctx,
+                    full_table_name1,
+                    full_table_name2,
+                    date_column,
+                    key_column,
+                    filter_conditions,
+                )
+                data_column_variance_analysis(
+                    ctx,
+                    full_table_name1,
+                    full_table_name2,
+                    date_column,
+                    key_column,
+                    filter_conditions,
+                )
 
             update_progress(100, "Analysis completed ✅")
 
