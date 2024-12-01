@@ -1,7 +1,9 @@
 """
-Description: This application compares two tables in Snowflake
+Snowflake Table Comparison App
+Description: This application provides comprehensive comparisons and analyses between two Snowflake tables,
+including schema, row-level, aggregate, column, and date column analysis.
 Author: Mitch Zink
-Last Updated: 4/6/2024
+Last Updated: 12/1/2024
 """
 
 import concurrent.futures
@@ -23,7 +25,11 @@ generated_date_queries = []
 
 def display_generated_queries_for_section(queries, section_name):
     """
-    Function to display generated queries for a specific analysis section
+    Display generated queries for a specific analysis section
+
+    Args:
+        queries (list): List of SQL queries to display
+        section_name (str): Name of the analysis section
     """
     if queries:  # Check if there are any queries to display
         with st.expander(f"{section_name} Queries 👨‍💻"):
@@ -33,7 +39,14 @@ def display_generated_queries_for_section(queries, section_name):
 
 def fetch_data(ctx, query):
     """
-    Query data from Snowflake
+    Fetch data from Snowflake
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        query (str): SQL query to execute
+
+    Returns:
+        DataFrame: Data retrieved from Snowflake
     """
     return pd.read_sql(query, ctx)
 
@@ -41,7 +54,17 @@ def fetch_data(ctx, query):
 # 📊 Aggregate Analysis Functions - Start
 def agg_analysis_fetch_schema(ctx, catalog, schema, table_name, filter_conditions=""):
     """
-    Fetch schema details from Snowflake
+    Fetch schema details for a specific table in Snowflake
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        catalog (str): Catalog name
+        schema (str): Schema name
+        table_name (str): Table name
+        filter_conditions (str, optional): Additional filter conditions. Defaults to ""
+
+    Returns:
+        DataFrame: Schema details of the table
     """
     # First attempt with normal filter
     where_clause = f" AND {filter_conditions}" if filter_conditions else ""
@@ -77,6 +100,15 @@ def perform_aggregate_analysis(
 ):
     """
     Perform aggregate analysis between two tables in Snowflake
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name1 (str): Fully qualified name of the first table
+        full_table_name2 (str): Fully qualified name of the second table
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+
+    Returns:
+        DataFrame: Results of the aggregate analysis
     """
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
@@ -204,7 +236,13 @@ def perform_aggregate_analysis(
 
 def agg_analysis_get_check_description(column):
     """
-    Generate descriptions based on aggregate column names (case-insensitive)
+    Generate descriptions based on aggregate column names
+
+    Args:
+        column (str): Name of the column
+
+    Returns:
+        str: Description of the check
     """
     column = (
         column.lower()
@@ -232,6 +270,13 @@ def agg_analysis_get_check_description(column):
 def agg_analysis_aggregate_expression(column_name, data_type):
     """
     Define aggregate expressions based on the data type of a column
+
+    Args:
+        column_name (str): Name of the column
+        data_type (str): Data type of the column
+
+    Returns:
+        str: SQL expression for aggregation
     """
     numeric_types = [
         "NUMBER",
@@ -281,6 +326,17 @@ def agg_analysis_execute_aggregate_query(
 ):
     """
     Execute an aggregate query on a table in Snowflake
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        catalog (str): Catalog name
+        schema (str): Schema name
+        table (str): Table name
+        aggregates (list): List of aggregate expressions
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+
+    Returns:
+        DataFrame: Results of the aggregate query
     """
     where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
     aggregates_sql = ", ".join(aggregates)
@@ -298,7 +354,10 @@ def agg_analysis_execute_aggregate_query(
 
 def plot_aggregate_analysis_summary(aggregate_results):
     """
-    Plot the results of aggregate analysis, indicating pass/fail status for each check
+    Plot the results of aggregate analysis
+
+    Args:
+        aggregate_results (DataFrame): Results of the aggregate analysis
     """
     if aggregate_results.empty:
         st.error("No results to display.")
@@ -423,6 +482,12 @@ def row_level_analysis_plot_comparison_results(
 ):
     """
     Plot the comparison results using a bar chart
+
+    Args:
+        differences (DataFrame): DataFrame of rows with differences
+        matched_but_different (DataFrame): DataFrame of matched rows with differences in columns
+        rows_fetched_from_first (int): Number of rows fetched from the first table
+        rows_fetched_from_second (int): Number of rows fetched from the second table
     """
     # Check for dummy rows (indicating a complete match) and adjust counts
     if not differences.empty and differences.iloc[0, 0] == "All rows match":
@@ -470,6 +535,14 @@ def row_level_analysis_plot_comparison_results(
 def row_level_analysis_compare_dataframes_by_key(df1, df2, key_column):
     """
     Compare two dataframes by a specific key column
+
+    Args:
+        df1 (DataFrame): First DataFrame
+        df2 (DataFrame): Second DataFrame
+        key_column (str): Name of the key column to compare by
+
+    Returns:
+        tuple: DataFrame of differences and DataFrame of matched rows with column differences
     """
     # Handling the scenario where both dataframes are identical
     if df1.equals(df2):
@@ -532,7 +605,17 @@ def row_level_analysis_fetch_data(
     ctx, full_table_name, key_column, filter_conditions="", row_count=50
 ):
     """
-    Fetches data from Snowflake for row level analysis, capturing and storing the executed SQL queries
+    Fetch data from Snowflake for row level analysis
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name (str): Fully qualified name of the table
+        key_column (str): Unique key column to order rows by
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+        row_count (int, optional): Number of rows to fetch from top/bottom. Defaults to 50
+
+    Returns:
+        DataFrame: Combined DataFrame of top and bottom rows
     """
     base_filter = f"WHERE {filter_conditions}" if filter_conditions else ""
     # Define queries for fetching data from the top and bottom of the table based on the key column
@@ -567,8 +650,18 @@ def row_level_analysis(
     row_count=50,
 ):
     """
-    Performs row level analysis between two tables, including fetching data, comparing dataframes,
-    and plotting comparison results
+    Perform row level analysis between two tables
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name1 (str): Fully qualified name of the first table
+        full_table_name2 (str): Fully qualified name of the second table
+        key_column (str): Unique key column to compare by
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+        row_count (int, optional): Number of rows to fetch from top/bottom. Defaults to 50
+
+    Returns:
+        tuple: DataFrame of differences and DataFrame of matched rows with column differences
     """
     df1 = row_level_analysis_fetch_data(
         ctx, full_table_name1, key_column, filter_conditions, row_count
@@ -594,7 +687,15 @@ def row_level_analysis(
 # 📊 Column Analysis Functions - Start
 def column_analysis(ctx, full_table_name1, full_table_name2):
     """
-    Compare schemas of two tables in Snowflake and fetch schema details
+    Compare schemas of two tables in Snowflake
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name1 (str): Fully qualified name of the first table
+        full_table_name2 (str): Fully qualified name of the second table
+
+    Returns:
+        DataFrame: Results of the column schema comparison
     """
     catalog1, schema1, table1 = full_table_name1.split(".")
     catalog2, schema2, table2 = full_table_name2.split(".")
@@ -644,6 +745,12 @@ def column_analysis(ctx, full_table_name1, full_table_name2):
 def column_analysis_comparison_results(column_comparison_results):
     """
     Plot schema comparison results using a bar chart
+
+    Args:
+        column_comparison_results (DataFrame): Results of the column schema comparison
+
+    Returns:
+        Figure: Bar chart figure
     """
     counts = column_comparison_results["Column Presence"].value_counts().reset_index()
     counts.columns = ["Category", "Count"]
@@ -667,7 +774,13 @@ def column_analysis_comparison_results(column_comparison_results):
 
 def plot_column_comparison_summary(column_comparison_results):
     """
-    Plot a summary of the schema comparison focusing on data type matches/mismatches
+    Plot a summary of the schema comparison focusing on data type matches
+
+    Args:
+        column_comparison_results (DataFrame): Results of the column schema comparison
+
+    Returns:
+        Figure: Bar chart figure
     """
     data_type_counts = (
         column_comparison_results["Data Type Match"]
@@ -698,6 +811,9 @@ def plot_column_comparison_summary(column_comparison_results):
 def display_column_analysis_charts(column_comparison_results):
     """
     Display column analysis charts side by side
+
+    Args:
+        column_comparison_results (DataFrame): Results of the column schema comparison
     """
     # Generate both figures for the column analysis
     fig1 = column_analysis_comparison_results(column_comparison_results)
@@ -718,6 +834,19 @@ def display_column_analysis_charts(column_comparison_results):
 def date_column_analysis(
     ctx, full_table_name, date_column, key_column, filter_conditions=""
 ):
+    """
+    Analyze data distribution in a date column
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name (str): Fully qualified name of the table
+        date_column (str): Name of the date column to analyze
+        key_column (str): Unique key column for grouping
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+
+    Returns:
+        DataFrame: Results of the date column analysis
+    """
     where_clause = f"WHERE {filter_conditions}" if filter_conditions else ""
     query = f"""
     SELECT 
@@ -748,6 +877,17 @@ def data_column_analysis(
     key_column,
     filter_conditions="",
 ):
+    """
+    Compare date column analysis results between two tables
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name1 (str): Fully qualified name of the first table
+        full_table_name2 (str): Fully qualified name of the second table
+        date_column (str): Name of the date column to analyze
+        key_column (str): Unique key column for grouping
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+    """
     st.header("Date Column Analysis 📅")
     with st.spinner(" 🏂"):
         # Perform date column analysis on both tables
@@ -888,6 +1028,17 @@ def data_column_variance_analysis(
     key_column,
     filter_conditions="",
 ):
+    """
+    Analyze variance in date column distributions between two tables
+
+    Args:
+        ctx (Connection): Snowflake connection object
+        full_table_name1 (str): Fully qualified name of the first table
+        full_table_name2 (str): Fully qualified name of the second table
+        date_column (str): Name of the date column to analyze
+        key_column (str): Unique key column for grouping
+        filter_conditions (str, optional): Filter conditions. Defaults to ""
+    """
     # Perform date column analysis on both tables
     df_date_analysis1 = date_column_analysis(
         ctx,
