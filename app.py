@@ -1128,16 +1128,43 @@ def main():
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
-        user = st.sidebar.text_input("Username 🧑‍💼").upper()
+
+        # Read Snowflake credentials from secrets.toml (if available)
+        credentials = st.secrets.get("snowflake_credentials", {})
+
+        # Populate default values if available in secrets.toml, otherwise leave blank
+        user = st.sidebar.text_input(
+            "Username 🧑‍💼", value=credentials.get("user", "")
+        ).upper()
         use_external_browser_auth = st.sidebar.checkbox(
-            "Use External Browser Authentication"
+            "Use External Browser Authentication", value=True
         )
         password = ""
         authenticator = "externalbrowser" if use_external_browser_auth else "snowflake"
+
         if not use_external_browser_auth:
-            password = st.sidebar.text_input("Password 🔒", type="password")
-        account = st.sidebar.text_input("Account 🏦").upper()
-        warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
+            # Fetch password only if available in secrets.toml
+            password = credentials.get("password", "")
+            if not password:
+                st.warning(
+                    "Password not found in secrets.toml. Please provide it below."
+                )
+                password = st.sidebar.text_input("Password 🔒", type="password")
+
+        account = st.sidebar.text_input(
+            "Account 🏦", value=credentials.get("account", "")
+        ).upper()
+        warehouse = st.sidebar.text_input(
+            "Warehouse 🏭", value=credentials.get("warehouse", "")
+        ).upper()
+
+        # Optional values for database and schema
+        database = st.sidebar.text_input(
+            "Default Database 📂", value=credentials.get("database", "")
+        ).upper()
+        schema = st.sidebar.text_input(
+            "Default Schema 🗄️", value=credentials.get("schema", "")
+        ).upper()
 
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
@@ -1149,7 +1176,6 @@ def main():
         key_column = st.sidebar.text_input(
             "Unique Key Column 🗝️", placeholder="UNIQUE_KEY"
         ).upper()
-        # Added date column input
         date_column = st.sidebar.text_input(
             "Date Column 📅", placeholder="DATE_COLUMN"
         ).upper()

@@ -6,7 +6,15 @@
 [![Snowflake](https://img.shields.io/badge/-Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)](https://snowflake.com/)
 [![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 
+---
+
 ## Setup Instructions
+
+### How to Set Up `secrets.toml`
+
+For more details, see the official Streamlit documentation on [Secrets Management](https://docs.streamlit.io/library/advanced-features/secrets-management)
+
+---
 
 ### Create a Virtual Environment, install dependencies, and run the app
 
@@ -21,6 +29,8 @@ python3 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip
 ```powershell
 py -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pip; pip install -r requirements.txt; streamlit run app.py
 ```
+
+---
 
 ## Overview
 
@@ -55,3 +65,9 @@ Compares unique key counts grouped by month-year between the two tables, ensurin
 ## Roadmap
 
 - Bug | External browser authentication doesn't work with the [streamlit hosted web version](https://snow-table-comparison.streamlit.app/), only locally
+
+#### Using `secrets.toml` for Secure Credential Management
+
+Streamlit provides a secure way to manage sensitive information, such as database credentials, through the `secrets.toml` file. This approach ensures that sensitive information is not hardcoded into the application code or exposed in version control.
+
+---
