@@ -24,9 +24,9 @@ py -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pi
 
 ## Overview
 
-![App Start-up](.screenshots/app.png)
-
 #### This tool analyzes differences between two Snowflake tables across five main sections:
+
+![App Start-up](.screenshots/app.png)
 
 #### 1. Row Level Analysis
 
