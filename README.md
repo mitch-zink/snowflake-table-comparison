@@ -12,15 +12,15 @@
 
 #### For Mac/Linux
 
-```bash
-python3 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
+````bash
+python3.12 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
 ```
 
 #### For Windows
 
 ```powershell
-py -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pip; pip install -r requirements.txt; streamlit run app.py
-```
+py -3.12 -m venv venv; .\venv\Scripts\Activate.ps1; python -m pip install --upgrade pip; pip install -r requirements.txt; streamlit run app.py
+````
 
 ## Overview
 

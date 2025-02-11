@@ -1,6 +1,6 @@
-numpy
-pandas
-snowflake-connector-python
-streamlit
-plotly
-sqlparse
+numpy==2.1.3
+pandas==2.2.3
+snowflake-connector-python==3.12.3
+streamlit==1.40.2
+plotly==5.24.1
+sqlparse==0.5.2
