@@ -12,7 +12,7 @@
 
 #### For Mac/Linux
 
-````bash
+```bash
 python3.12 -m venv .venv && source .venv/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt && streamlit run app.py
 ```
 
