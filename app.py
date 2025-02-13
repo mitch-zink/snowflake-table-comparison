@@ -1128,7 +1128,7 @@ def main():
     # Configuration sidebar setup within a form
     with st.sidebar.form(key="config_form"):
         st.sidebar.header("Configuration ⚙️")
-        user = st.sidebar.text_input("Username 🧑‍💼").upper()
+        user = st.sidebar.text_input("Username 🧑‍💼").strip().upper()
         use_external_browser_auth = st.sidebar.checkbox(
             "Use External Browser Authentication"
         )
@@ -1136,8 +1136,8 @@ def main():
         authenticator = "externalbrowser" if use_external_browser_auth else "snowflake"
         if not use_external_browser_auth:
             password = st.sidebar.text_input("Password 🔒", type="password")
-        account = st.sidebar.text_input("Account 🏦").upper()
-        warehouse = st.sidebar.text_input("Warehouse 🏭").upper()
+        account = st.sidebar.text_input("Account 🏦").strip().upper()
+        warehouse = st.sidebar.text_input("Warehouse 🏭").strip().upper()
 
         row_count = st.sidebar.slider(
             "Number of Rows from Top/Bottom",
@@ -1146,23 +1146,30 @@ def main():
             value=50,
             step=10,
         )
-        key_column = st.sidebar.text_input(
-            "Unique Key Column 🗝️", placeholder="UNIQUE_KEY"
-        ).upper()
-        # Added date column input
-        date_column = st.sidebar.text_input(
-            "Date Column 📅", placeholder="DATE_COLUMN"
-        ).upper()
-        full_table_name1 = st.sidebar.text_input(
-            "Table 1 ❄️", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
-        full_table_name2 = st.sidebar.text_input(
-            "Table 2 ❄️", placeholder="DATABASE.SCHEMA.TABLE"
-        ).upper()
+        key_column = (
+            st.sidebar.text_input("Unique Key Column 🗝️", placeholder="UNIQUE_KEY")
+            .strip()
+            .upper()
+        )
+        date_column = (
+            st.sidebar.text_input("Date Column 📅", placeholder="DATE_COLUMN")
+            .strip()
+            .upper()
+        )
+        full_table_name1 = (
+            st.sidebar.text_input("Table 1 ❄️", placeholder="DATABASE.SCHEMA.TABLE")
+            .strip()
+            .upper()
+        )
+        full_table_name2 = (
+            st.sidebar.text_input("Table 2 ❄️", placeholder="DATABASE.SCHEMA.TABLE")
+            .strip()
+            .upper()
+        )
         filter_conditions = st.sidebar.text_area(
             "Filter conditions (optional) ✨",
             placeholder="EMAIL = 'mitch@example.com' AND DATE::DATE >= '2024-01-01'::DATE",
-        )
+        ).strip()
 
     if "progress" not in st.session_state:
         st.session_state.progress = 0
