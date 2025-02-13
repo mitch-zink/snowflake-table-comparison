@@ -1167,7 +1167,7 @@ def main():
             .upper()
         )
         filter_conditions = st.sidebar.text_area(
-            "Filter conditions (optional) ✨",
+            "Filter conditions 🎚️",
             placeholder="EMAIL = 'mitch@example.com' AND DATE::DATE >= '2024-01-01'::DATE",
         ).strip()
 
@@ -1207,7 +1207,6 @@ def main():
             return
 
         try:
-            # st.snow()
             update_progress(5, "Connecting to Snowflake 🏂")
             ctx = snowflake.connector.connect(
                 user=user,
@@ -1217,54 +1216,65 @@ def main():
                 warehouse=warehouse,
             )
 
-            update_progress(15, "Working on Row Level Analysis 🏂")
+            # Row Level Analysis
+            if key_column:
+                update_progress(15, "Working on Row Level Analysis 🏂")
+                st.header("Row Level Analysis 🔎")
+                with st.spinner("🏂"):
+                    differences, matched_but_different = row_level_analysis(
+                        ctx,
+                        full_table_name1,
+                        full_table_name2,
+                        key_column,
+                        filter_conditions,
+                        row_count,
+                    )
 
-            st.header("Row Level Analysis 🔎")
-            with st.spinner("🏂"):
-                differences, matched_but_different = row_level_analysis(
-                    ctx,
-                    full_table_name1,
-                    full_table_name2,
-                    key_column,
-                    filter_conditions,
-                    row_count,
+                    if (
+                        not differences.empty
+                        and not differences.iloc[0, 0] == "All rows match"
+                    ):
+                        with st.expander("Row Discrepancies ⚠️"):
+                            st.dataframe(differences)
+
+                    if (
+                        not matched_but_different.empty
+                        and not matched_but_different.iloc[0, 0] == "All rows match"
+                    ):
+                        with st.expander("Column Discrepancies ⚠️"):
+                            st.dataframe(matched_but_different)
+
+                    display_generated_queries_for_section(generated_row_queries, "")
+                    differences_count = (
+                        0
+                        if not differences.empty
+                        and differences.iloc[0, 0] == "All rows match"
+                        else len(differences)
+                    )
+                    matched_but_different_count = (
+                        0
+                        if not matched_but_different.empty
+                        and matched_but_different.iloc[0, 0] == "All rows match"
+                        else len(matched_but_different)
+                    )
+                    if differences_count == 0 and matched_but_different_count == 0:
+                        row_level_analysis_flag = "✅"
+
+                progress_message = (
+                    f"Aggregate Analysis: {agg_analysis_flag}\n"
+                    f"Row Level Analysis: {row_level_analysis_flag}"
                 )
+            else:
+                # If key_column is blank, skip row level analysis
+                st.header("Row Level Analysis 🔎")
 
-                if (
-                    not differences.empty
-                    and not differences.iloc[0, 0] == "All rows match"
-                ):
-                    with st.expander("Row Discrepancies ⚠️"):
-                        st.dataframe(differences)
-
-                if (
-                    not matched_but_different.empty
-                    and not matched_but_different.iloc[0, 0] == "All rows match"
-                ):
-                    with st.expander("Column Discrepancies ⚠️"):
-                        st.dataframe(matched_but_different)
-
-                display_generated_queries_for_section(generated_row_queries, "")
-                # Calculate the counts for differences and matched_but_different
-                differences_count = (
-                    0
-                    if not differences.empty
-                    and differences.iloc[0, 0] == "All rows match"
-                    else len(differences)
+                st.warning(
+                    "The unique key column is required to run Row Level Analysis"
                 )
-                matched_but_different_count = (
-                    0
-                    if not matched_but_different.empty
-                    and matched_but_different.iloc[0, 0] == "All rows match"
-                    else len(matched_but_different)
+                progress_message = (
+                    f"Aggregate Analysis: {agg_analysis_flag}\n"
+                    f"Row Level Analysis: {row_level_analysis_flag}"
                 )
-
-                # Set the flag for row level analysis
-                if differences_count == 0 and matched_but_different_count == 0:
-                    row_level_analysis_flag = "✅"
-
-                # Update progress with the flags and line breaks
-                progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
 
             update_progress(40, "Working on Column Analysis 🏂")
             st.header("Column Analysis 🔎")
@@ -1280,9 +1290,7 @@ def main():
             display_generated_queries_for_section(generated_column_queries, "")
 
             update_progress(60, "Working on Schema Analysis 🏂")
-
             st.header("Schema Analysis 🔎")
-
             with st.spinner(" 🏂"):
                 df_merged, formatted_queries = schema_analysis(
                     ctx, full_table_name1, full_table_name2, st
@@ -1294,7 +1302,6 @@ def main():
 
             update_progress(80, "Working on Aggregate Analysis 🏂")
             st.header("Aggregate Analysis 🔎")
-
             with st.spinner(" 🏂"):
                 aggregate_results = perform_aggregate_analysis(
                     ctx, full_table_name1, full_table_name2, filter_conditions
@@ -1304,15 +1311,16 @@ def main():
                     st.dataframe(aggregate_results)
                 display_generated_queries_for_section(generated_aggregate_queries, "")
 
-                # Set the flag for aggregate analysis
                 if all(aggregate_results["Result"] == "Match"):
                     agg_analysis_flag = "✅"
 
-                # Update progress with the flags and line breaks
-                progress_message = f"Aggregate Analysis: {agg_analysis_flag}\nRow Level Analysis: {row_level_analysis_flag}"
+                progress_message = (
+                    f"Aggregate Analysis: {agg_analysis_flag}\n"
+                    f"Row Level Analysis: {row_level_analysis_flag}"
+                )
 
             update_progress(90, "Working on Date Column Analysis 🏂")
-
+            st.header("Date Column Analysis 🔎")
             if date_column:
                 data_column_analysis(
                     ctx,
@@ -1330,9 +1338,10 @@ def main():
                     key_column,
                     filter_conditions,
                 )
+            else:
+                st.warning("The date column is required to run Date Column Analysis")
 
             update_progress(100, "Analysis completed ✅")
-
             update_progress(100, progress_message)
 
         except Exception as e:
