@@ -1320,7 +1320,7 @@ def main():
                 )
 
             update_progress(90, "Working on Date Column Analysis 🏂")
-            st.header("Date Column Analysis 🔎")
+            # st.header("Date Column Analysis 🔎")
             if date_column:
                 data_column_analysis(
                     ctx,
